@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.git/
+.gitignore
+.python-version
+uv.lock
+.streamlit/config.toml (optional, let's keep it in image)
+logs/*.log
+brain/
+C:/Users/bhavy/.gemini/

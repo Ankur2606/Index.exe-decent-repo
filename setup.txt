@@ -1,0 +1,26 @@
+Installation and Setup Instructions for ASTraM Traffic Event Intelligence
+
+Prerequisites
+* Python version 3.11 or greater
+* uv package manager (recommended for speed and automated environment setup)
+
+Local Environment Setup
+
+Step 1: Install uv Package Manager
+If uv is not installed, install it using the appropriate command for your system:
+For Windows PowerShell:
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+For macOS and Linux:
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+
+Step 2: Sync Dependencies and Build Virtual Environment
+From the project root directory, compile and synchronize all required libraries:
+    uv sync
+
+Step 3: Run the Streamlit Application
+Start the multi page dashboard local server:
+    uv run streamlit run streamlit_app/app.py
+
+System Requirements
+* CUDA capable GPU is detected and utilized automatically for neural network inference.
+* CPU execution will serve as a fallback if no GPU is available.

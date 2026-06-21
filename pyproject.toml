@@ -1,7 +1,7 @@
 [project]
-name = "ps2"
+name = "event-driven-congestion"
 version = "0.1.0"
-description = "Add your description here"
+description = "Flipkart Gridlock PS2 Submission Demo by Team Insight.exe"
 readme = "README.md"
 authors = [
     { name = "Bhavya", email = "ankursinghtomar2606@gmail.com" }
@@ -22,6 +22,14 @@ dependencies = [
     "torch",
     "torchvision",
     "torchaudio",
+    "streamlit>=1.58.0",
+    "matplotlib>=3.10.9",
+    "folium>=0.20.0",
+    "streamlit-folium>=0.27.2",
+    "plotly>=6.8.0",
+    "geopy>=2.4.1",
+    "joblib>=1.5.3",
+    "pyarrow>=24.0.0",
 ]
 
 [build-system]
