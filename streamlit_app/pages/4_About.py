@@ -80,7 +80,7 @@ mermaid_html = """
             SharedDense --> Head1["Event Impact Score (EIS) Head<br>(Continuous regression with MSE loss)"]
             SharedDense --> Head2["Manpower Dispatch Head<br>(Discrete Poisson with Stirling NLL loss)"]
             SharedDense --> Head3["Barricade Dispatch Head<br>(Discrete Poisson with Stirling NLL loss)"]
-            SharedDense --> Head4["Diversion Plan Head<br>(Binary sigmoid classifier with BCE loss)"]
+            SharedDense --> Head4["Diversion Plan Head<br>(Binary sigmoid classifier with Weighted BCE loss handling data imabalance)"]
 
             TabularInputs["Tabular Features<br>(Label-Encoded Categories + Numerical Scales)"] --> LGBM["5-Fold LightGBM Ensemble<br>(Robust decision boundary estimators)"]
 
@@ -93,7 +93,7 @@ mermaid_html = """
             Head3 --> CombineBarricades["Weighted Barricades Combiner<br>(50% Neural Network + 50% LightGBM)"]
             LGBM --> CombineBarricades
 
-            Head4 --> CombineDiversions["Weighted Diversion Combiner<br>(50% Neural Network + 50% LightGBM)"]
+            Head4 --> CombineDiversions["Weighted Diversion Combiner<br>(30% Neural Network + 70% LightGBM)"]
             LGBM --> CombineDiversions
 
             CombineEIS --> Out1["Final Event Impact Score (0 - 100)"]
