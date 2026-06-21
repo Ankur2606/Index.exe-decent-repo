@@ -10,7 +10,7 @@ Developed by Team Insight.exe
 * Chitrakshi Gagrani
 * Divyanshi Goyal
 
-Deployed Application Prototype: https://huggingface.co/spaces/DecentSanage/astram-traffic-intel
+Deployed Application Prototype: https://index-exe-traffic-demand.streamlit.app/
 
 ## Abstract
 Bengaluru faces complex urban traffic challenges where real time events such as vehicle breakdowns, public processions, construction bottlenecks, and sudden weather anomalies cause cascading gridlocks. Traditional traffic control relies on reactive policing. This research presents the Active Spatio Temporal Resource Management (ASTraM) platform, a hybrid predictive system that forecasts event severity and automates operational resource dispatch recommendations for the Bengaluru Traffic Police. By combining deep semantic representation encoders with gradient boosted decision trees, the system estimates the Event Impact Score, calculates optimal personnel deployments, recommends barricade dispatches, and determines alternate route diversion protocols.
