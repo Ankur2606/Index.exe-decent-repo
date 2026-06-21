@@ -10,7 +10,7 @@ Developed by Team Insight.exe
 * Chitrakshi Gagrani
 * Divyanshi Goyal
 
-Deployed Application Prototype: https://huggingface.co/spaces/Insight-exe/astram-traffic-intel
+Deployed Application Prototype: https://index-exe-traffic-demand.streamlit.app/
 
 ## Abstract
 Bengaluru faces complex urban traffic challenges where real time events such as vehicle breakdowns, public processions, construction bottlenecks, and sudden weather anomalies cause cascading gridlocks. Traditional traffic control relies on reactive policing. This research presents the Active Spatio Temporal Resource Management (ASTraM) platform, a hybrid predictive system that forecasts event severity and automates operational resource dispatch recommendations for the Bengaluru Traffic Police. By combining deep semantic representation encoders with gradient boosted decision trees, the system estimates the Event Impact Score, calculates optimal personnel deployments, recommends barricade dispatches, and determines alternate route diversion protocols.
@@ -55,14 +55,24 @@ Predictions from the 5 deep learning folds and the 5 gradient boosted forest fol
 * Diversion Decisions: 50 percent Neural Network and 50 percent LightGBM
 
 ## Application Interfaces and Visualizations
+### Prediction Page
+<img width="1265" height="679" alt="image" src="https://github.com/user-attachments/assets/178e529e-c72f-47fa-91a9-83b8b9e9850d" />
 
-[Insert Predict Dashboard Screenshot Here]
+---
 
-[Insert Live Operations Map Screenshot Here]
+### HeatMap Generation W.R.T Location and Cause
+<img width="1121" height="615" alt="image" src="https://github.com/user-attachments/assets/74c5fde1-7bd1-468c-a256-9096431830a6" />
 
-[Insert Analytics Dashboard Screenshot Here]
+---
 
-[Insert Project Context and Mermaid Flowchart Screenshot Here]
+### Graphical Analytics
+<img width="1213" height="622" alt="image" src="https://github.com/user-attachments/assets/0df0d205-8669-4585-9508-937879f328a8" />
+
+---
+
+### ML/DL Model Architecture
+<img width="1022" height="522" alt="image" src="https://github.com/user-attachments/assets/74fba4a3-8dc8-4710-ab5e-9cd7cfcab7a0" />
+
 
 ## Source Code Directory Structure
 
