@@ -1,0 +1,39 @@
+[project]
+name = "ps2"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Bhavya", email = "ankursinghtomar2606@gmail.com" }
+]
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "numpy",
+    "pandas",
+    "tensorflow",
+    "geohash2",
+    "scikit-learn",
+    "ipykernel",
+    "lightgbm",
+    "catboost",
+    "optuna",
+    "pygeohash",
+    "sentence-transformers>=5.6.0",
+    "torch",
+    "torchvision",
+    "torchaudio",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12.0"]
+build-backend = "uv_build"
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu128", marker = "sys_platform == 'win32'" }]
+torchvision = [{ index = "pytorch-cu128", marker = "sys_platform == 'win32'" }]
+torchaudio = [{ index = "pytorch-cu128", marker = "sys_platform == 'win32'" }]
