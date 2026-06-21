@@ -62,6 +62,8 @@ st.title("Traffic Incident Dispatch Panel")
 st.caption("Input incident parameters to forecast Event Impact Score (EIS) and dispatch resources.")
 
 # 3. Initialize Session States for reactive coordinates and dropdowns
+vocabularies = engine.vocabularies
+
 if 'lat' not in st.session_state:
     st.session_state.lat = 12.9716  # Bangalore center lat
 if 'lon' not in st.session_state:
@@ -79,8 +81,16 @@ if 'zone_val' not in st.session_state:
 if 'prediction_result' not in st.session_state:
     st.session_state.prediction_result = None
 
-# Vocabularies
-vocabularies = engine.vocabularies
+if 'event_type_val' not in st.session_state:
+    st.session_state.event_type_val = vocabularies.get('event_type', ['unplanned', 'planned'])[0]
+if 'event_cause_val' not in st.session_state:
+    st.session_state.event_cause_val = vocabularies.get('event_cause', ['others'])[0]
+if 'priority_val' not in st.session_state:
+    st.session_state.priority_val = vocabularies.get('priority', ['High', 'Low'])[0]
+if 'veh_type_val' not in st.session_state:
+    st.session_state.veh_type_val = vocabularies.get('veh_type', ['unknown'])[0]
+if 'description_val' not in st.session_state:
+    st.session_state.description_val = ""
 
 # 5. Create Columns Layout: Left = Inputs, Right = Results
 left_col, right_col = st.columns([1, 1])
@@ -88,6 +98,22 @@ left_col, right_col = st.columns([1, 1])
 with left_col:
     st.subheader("Incident Log Entry")
     
+    # Preset Scenario Injector Button
+    if st.button("🚨 INJECT HIGH-IMPACT PRESET (DIVERSION REQUIRED)", help="Click to populate the form with a planned Metro construction event that triggers a diversion requirement."):
+        st.session_state.lat = 12.9685753
+        st.session_state.lon = 77.7011831
+        st.session_state.address_select_idx = 0
+        st.session_state.custom_address = "Marathahalli Outer Ring Road, Bengaluru"
+        st.session_state.corridor_val = "ORR East 2"
+        st.session_state.police_station_val = "HAL Old Airport"
+        st.session_state.zone_val = "East Zone 1"
+        st.session_state.event_type_val = "planned"
+        st.session_state.event_cause_val = "construction"
+        st.session_state.priority_val = "High"
+        st.session_state.veh_type_val = "unknown"
+        st.session_state.description_val = "[LOCATION] towards marathhalli and karthiknagara towards mahadevpura traffic movement will be slow due to metrostation work"
+        st.rerun()
+        
     # Address selection
     address_options = ["Other / Manual GPS Input"] + list(db.keys())
     selected_address = st.selectbox(
@@ -197,19 +223,23 @@ with left_col:
     with conf_col1:
         event_type = st.selectbox(
             "Event Type",
-            options=vocabularies.get('event_type', ['unplanned', 'planned'])
+            options=vocabularies.get('event_type', ['unplanned', 'planned']),
+            key="event_type_val"
         )
         event_cause = st.selectbox(
             "Event Cause",
-            options=vocabularies.get('event_cause', ['others'])
+            options=vocabularies.get('event_cause', ['others']),
+            key="event_cause_val"
         )
         priority = st.selectbox(
             "Priority",
-            options=vocabularies.get('priority', ['High', 'Low'])
+            options=vocabularies.get('priority', ['High', 'Low']),
+            key="priority_val"
         )
         veh_type = st.selectbox(
             "Vehicle Type",
-            options=vocabularies.get('veh_type', ['unknown'])
+            options=vocabularies.get('veh_type', ['unknown']),
+            key="veh_type_val"
         )
     with conf_col2:
         # Corridor Select
@@ -260,7 +290,8 @@ with left_col:
         "Incident Description (English / Kannada)",
         placeholder="Type description here... e.g. Traffic jam near Silk Board due to waterlogging.",
         max_chars=500,
-        height=100
+        height=100,
+        key="description_val"
     )
     
     # 6. Predict Button

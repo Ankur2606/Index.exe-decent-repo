@@ -149,11 +149,13 @@ class InferenceEngine:
         # - EIS: 40% NN + 60% GBDT
         # - Manpower: 10% NN + 90% GBDT
         # - Barricades: 50% NN + 50% GBDT
-        # - Diversion: 50% NN + 50% GBDT
+        # - Diversion: 30% NN + 70% GBDT
+        #   (LGB models trained with scale_pos_weight are highly calibrated; blending
+        #    with standard unweighted NN preserves stability and maximizes overall F1)
         fused_eis = 0.4 * avg_nn_eis + 0.6 * avg_lgb_eis
         fused_manpower = 0.1 * avg_nn_manpower + 0.9 * avg_lgb_manpower
         fused_barricades = 0.5 * avg_nn_barricades + 0.5 * avg_lgb_barricades
-        fused_diversion_prob = 0.5 * avg_nn_diversion + 0.5 * avg_lgb_diversion
+        fused_diversion_prob = 0.3 * avg_nn_diversion + 0.7 * avg_lgb_diversion
         
         # 7. Apply Physical Constraints and Post-processing
         eis_final = np.clip(fused_eis, 0.0, 100.0)

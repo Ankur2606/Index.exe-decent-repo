@@ -134,8 +134,8 @@ with m_col1:
     st.markdown("""
     <div style="background-color: #1A1D26; border-radius: 6px; padding: 1.5rem 1rem; border-top: 4px solid #2ECC71; text-align: center; min-height: 120px;">
         <span style="font-size: 0.8rem; color: #8A8F98; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 0.5rem;">Event Impact Score</span>
-        <span style="font-size: 1.8rem; font-weight: bold; color: #FAFAFA; display: block; margin-bottom: 0.3rem;">95.89%</span>
-        <span style="font-size: 0.8rem; color: #2ECC71; font-weight: 500;">R²: 0.6968</span>
+        <span style="font-size: 1.8rem; font-weight: bold; color: #FAFAFA; display: block; margin-bottom: 0.3rem;">95.97%</span>
+        <span style="font-size: 0.8rem; color: #2ECC71; font-weight: 500;">R²: 0.7011</span>
     </div>
     """, unsafe_allow_html=True)
     
@@ -143,8 +143,8 @@ with m_col2:
     st.markdown("""
     <div style="background-color: #1A1D26; border-radius: 6px; padding: 1.5rem 1rem; border-top: 4px solid #3498DB; text-align: center; min-height: 120px;">
         <span style="font-size: 0.8rem; color: #8A8F98; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 0.5rem;">Manpower Dispatch</span>
-        <span style="font-size: 1.8rem; font-weight: bold; color: #FAFAFA; display: block; margin-bottom: 0.3rem;">96.62%</span>
-        <span style="font-size: 0.8rem; color: #3498DB; font-weight: 500;">R²: 0.8611</span>
+        <span style="font-size: 1.8rem; font-weight: bold; color: #FAFAFA; display: block; margin-bottom: 0.3rem;">96.67%</span>
+        <span style="font-size: 0.8rem; color: #3498DB; font-weight: 500;">R²: 0.8666</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -152,8 +152,8 @@ with m_col3:
     st.markdown("""
     <div style="background-color: #1A1D26; border-radius: 6px; padding: 1.5rem 1rem; border-top: 4px solid #9B59B6; text-align: center; min-height: 120px;">
         <span style="font-size: 0.8rem; color: #8A8F98; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 0.5rem;">Barricades Dispatch</span>
-        <span style="font-size: 1.8rem; font-weight: bold; color: #FAFAFA; display: block; margin-bottom: 0.3rem;">95.06%</span>
-        <span style="font-size: 0.8rem; color: #9B59B6; font-weight: 500;">R²: 0.8297</span>
+        <span style="font-size: 1.8rem; font-weight: bold; color: #FAFAFA; display: block; margin-bottom: 0.3rem;">95.08%</span>
+        <span style="font-size: 0.8rem; color: #9B59B6; font-weight: 500;">R²: 0.8302</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -161,7 +161,7 @@ with m_col4:
     st.markdown("""
     <div style="background-color: #1A1D26; border-radius: 6px; padding: 1.5rem 1rem; border-top: 4px solid #E74C3C; text-align: center; min-height: 120px;">
         <span style="font-size: 0.8rem; color: #8A8F98; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 0.5rem;">Diversion Decisions</span>
-        <span style="font-size: 1.8rem; font-weight: bold; color: #FAFAFA; display: block; margin-bottom: 0.3rem;">91.64%</span>
+        <span style="font-size: 1.8rem; font-weight: bold; color: #FAFAFA; display: block; margin-bottom: 0.3rem;">91.45%</span>
         <span style="font-size: 0.8rem; color: #E74C3C; font-weight: 500;">Accuracy Rate</span>
     </div>
     """, unsafe_allow_html=True)
@@ -171,10 +171,10 @@ st.markdown("#### Validation Performance and Safety Bounds")
 st.markdown(r"""
 | Target Variable | Primary Metric | Model Reliability (Percentage) | Average Operational Error | Error Margin & Boundaries |
 | :--- | :--- | :--- | :--- | :--- |
-| **Event Impact Score (EIS)** | R²: `0.6968` | **`95.89%` Accuracy** | &plusmn; 4.11 points (Scale 0 to 100) | &plusmn; 7.4 points (RMSE) in extreme cases |
-| **Manpower Recommendation** | R²: `0.8611` | **`96.62%` Accuracy** | &plusmn; 0.33 officers (Scale 1 to 30) | Off by >= 1 officer in only 20% of cases |
-| **Barricade Recommendation** | R²: `0.8297` | **`95.06%` Accuracy** | &plusmn; 2.47 barricades (Scale 0 to 50) | Off by >= 5 barricades in only 10% of cases |
-| **Diversion Requirement** | Accuracy: `91.64%` | **`91.64%` Accuracy** | Not Applicable | `8.36%` Error Rate (Correct 11 of 12 times) |
+| **Event Impact Score (EIS)** | R²: `0.7011` | **`95.97%` Accuracy** | &plusmn; 4.03 points (Scale 0 to 100) | &plusmn; 7.38 points (RMSE) in extreme cases |
+| **Manpower Recommendation** | R²: `0.8666` | **`96.67%` Accuracy** | &plusmn; 0.33 officers (Scale 1 to 30) | Off by >= 1 officer in only 20% of cases |
+| **Barricade Recommendation** | R²: `0.8302` | **`95.08%` Accuracy** | &plusmn; 2.39 barricades (Scale 0 to 50) | Off by >= 5 barricades in only 10% of cases |
+| **Diversion Requirement** | Accuracy: `91.45%` | **`91.45%` Accuracy** | Recall: `76.68%` (F1-Score: `0.7841`) | `8.55%` Error Rate (Correct 11 of 12 times) |
 """)
 
 st.markdown("<hr style='border: 0; border-top: 1px solid #2C303E; margin: 1.5rem 0;'>", unsafe_allow_html=True)

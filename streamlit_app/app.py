@@ -149,10 +149,10 @@ def main():
         st.markdown("### Model Trust Summary")
         st.write("Out-Of-Fold Validation Performance:")
         st.markdown(f"""
-        - **EIS Accuracy:** `95.89%` (R²: `0.6968`)
-        - **Manpower Dispatch:** `96.62%` (R²: `0.8611`)
-        - **Barricades Dispatch:** `95.06%` (R²: `0.8297`)
-        - **Diversion Decisions:** `91.64%` Accuracy
+        - **EIS Accuracy:** `95.97%` (R²: `0.7011`)
+        - **Manpower Dispatch:** `96.67%` (R²: `0.8666`)
+        - **Barricades Dispatch:** `95.08%` (R²: `0.8302`)
+        - **Diversion Decisions:** `91.45%` Accuracy (Recall: `76.68%`)
         """)
 
 if __name__ == "__main__":

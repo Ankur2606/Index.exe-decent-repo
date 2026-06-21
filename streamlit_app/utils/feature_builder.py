@@ -3,6 +3,16 @@ import pandas as pd
 import torch
 import pygeohash as pgh
 
+# Disable pandas 2.x Arrow-backed string inference for column Index creation.
+# When PyArrow is installed alongside LightGBM/PyTorch C extensions, the Arrow
+# allocator state can be perturbed causing a Windows access violation inside
+# pandas.core.arrays.string_arrow._from_sequence during pd.DataFrame() init.
+# Forcing numpy-backed strings avoids this entirely.
+try:
+    pd.options.future.infer_string = False
+except Exception:
+    pass
+
 def build_features(
     lat: float,
     lon: float,

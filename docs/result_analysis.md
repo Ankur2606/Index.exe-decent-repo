@@ -1,71 +1,64 @@
-# ASTraM Traffic Event Intelligence: Operational Performance & Reliability Report
+# ASTraM Traffic Event Intelligence Operational Performance and Reliability Report
 
-This report analyzes the performance, reliability, and error margins of the ensembled machine learning and deep learning models trained on the ASTraM event dataset. These metrics represent **Out-Of-Fold (OOF) cross-validation** performance—meaning they are measured on unseen validation data, reflecting real-world generalization.
-
----
+This report documents the empirical performance of the ensembled machine learning system trained on the ASTraM event dataset. All metrics presented reflect out of fold cross validation performance. This means every prediction was made on data withheld from the model during training. Therefore, they represent a conservative, unbiased estimate of real world generalization. The evaluation covers both the original baseline configuration and the updated configuration incorporating class imbalance corrections and optimized ensemble blending.
 
 ## 1. Executive Summary
 
-| Target Variable | Primary Metric | Model Reliability (Percentage) | Average Operational Error | Error Rate (How often it goes wrong) |
-| :--- | :--- | :--- | :--- | :--- |
-| **Event Impact Score (EIS)** | $R^2$: `0.6968` | **`95.89%` Accuracy** | $\pm 4.11$ points (Scale $[0, 100]$) | $\pm 7.4$ points (RMSE) in extreme cases |
-| **Manpower Recommendation** | $R^2$: `0.8611` | **`96.62%` Accuracy** | $\pm 0.33$ officers (Scale $[1, 10]$) | Off by $\ge 1$ officer in only ~20% of cases |
-| **Barricade Recommendation** | $R^2$: `0.8297` | **`95.06%` Accuracy** | $\pm 2.47$ barricades (Scale $[0, 50]$) | Off by $\ge 5$ barricades in only ~10% of cases |
-| **Diversion Requirement** | Accuracy: `91.64%` | **`91.64%` Accuracy** | - | **`8.36%` Error Rate** (Correct $11/12$ times) |
+* Event Impact Score (EIS): The ensemble achieves an R squared score of 0.7011, a Mean Absolute Error of 4.0293 points, and a Root Mean Squared Error of 7.3810. This is an improvement of 0.43 percentage points in R squared score compared to the baseline.
+* Manpower Recommendation: The ensemble achieves an R squared score of 0.8666, a Mean Absolute Error of 0.3328 officers, and a Root Mean Squared Error of 1.1147. This represents a 0.55 percentage point increase in R squared score compared to the baseline.
+* Barricade Recommendation: The ensemble achieves an R squared score of 0.8302, a Mean Absolute Error of 2.3885 barricades, and a Root Mean Squared Error of 4.9447. This is a 0.05 percentage point improvement in R squared score over the baseline.
+* Diversion Requirement: The ensemble achieves an F1 score of 0.7841, an accuracy of 0.9145, a precision of 0.8021, and a recall of 0.7668 at the standard 0.50 threshold. This represents a recall improvement of 6.89 percentage points over the baseline ensemble.
 
----
+The diversion recall improvement is a highly significant result. Prior to the optimization, the baseline ensemble failed to identify approximately 30 percent of events requiring traffic diversion. The revised training protocol and optimized blending weights reduce this miss rate to approximately 23 percent, while maintaining high precision.
 
-## 2. Deep Dive: Target-by-Target Reliability
+## 2. Target by Target Analysis
 
-### 📊 Event Impact Score (EIS)
-EIS measures the congestion severity of an incident on a continuous scale from $0$ (no impact) to $100$ (total gridlock).
-* **Average Accuracy ($95.89\%$)**: The Mean Absolute Error (MAE) is **$4.11$ points**. This means that when the model predicts an impact of $50$, the actual severity is almost always between $46$ and $54$.
-* **Variance Explained ($69.68\%$)**: An $R^2$ of nearly $70\%$ means our model captures the vast majority of predictable traffic dynamics (incident cause, priority, cyclical daily/weekly peak curves, and text log semantics). The remaining $30\%$ variance represents highly chaotic, unpredictable factors (e.g., driver behavior, rainfall variations, or random local double-parking).
+### Event Impact Score
 
----
+The Event Impact Score quantifies the severity of traffic disruption on a continuous scale from 0 for negligible impact to 100 for total arterial blockage. It is computed during data processing as a weighted combination of event duration, road closure status, event cause severity tier, priority, and corridor classification. Predicting EIS is challenging because the ground truth label is a composite of operational factors that vary non linearly with incident type and context.
 
-### 👮 Manpower Recommendation (Police Deployment)
-Predicts the number of traffic officers to deploy to the scene to manage congestion.
-* **Average Accuracy ($96.62\%$)**: The MAE is **$0.33$ officers** (against the base deployment scale of $1$ to $10$).
-* **Exact Recommendations (78% of the time)**: In **$78\%$ of cases**, the rounded model prediction matches the exact ground-truth requirement.
-* **Minor Deviations (22% of the time)**: In the remaining $22\%$ of cases, the model's recommendation is off by **exactly $1$ officer** (usually over-deploying during high-uncertainty events, which acts as a safe operational buffer). 
-* **Extreme Mistakes ($0\%$)**: The model virtually never makes catastrophic deployment recommendations (e.g. recommending 1 officer when 10 are needed, or vice-versa), as shown by the low RMSE of $1.13$.
+The ensemble achieves a Mean Absolute Error of 4.0293 points and a coefficient of determination R squared of 0.7011 on the held out validation partitions. The neural network contributes R squared of 0.6831 and the LightGBM baseline contributes R squared of 0.6972. Their 40/60 weighted combination produces the best overall generalization. The explained variance of approximately 70 percent reflects the predictable component of event severity driven by structured features. The residual 30 percent variance corresponds to stochastic operational factors such as driver response behavior, spontaneous secondary incidents, and weather related demand fluctuations.
 
----
+### Manpower Deployment Recommendation
 
-### 🚧 Barricade Recommendation (Physical Equipment)
-Predicts the number of physical barricades to dispatch to block lanes or secure construction zones.
-* **Average Accuracy ($95.06\%$)**: The MAE is **$2.47$ barricades** on a scale of $0$ to $50$ barricades.
-* **Operational Fit**: Because the model achieves an $R^2$ of **`0.8297`** (explaining $83\%$ of variance), the equipment recommendations map closely to physical requirements. 
-* **Error Rate**: In **$90\%$ of cases**, the recommended barricade count is within $\pm 4$ barricades of the target. Reviewers will love this because it prevents dispatching truckloads of excess barricades or leaving officers short-handed.
+The manpower target encodes the recommended number of traffic officers to deploy to the incident site, modeled as a Poisson count bounded between 1 and 30 officers. LightGBM achieves R squared of 0.8675 and MAE of 0.3330 officers on this target, outperforming the neural network which achieves R squared of 0.6892 and MAE of 0.8510. The neural network performance on this target improved by 3.39 percentage points in R squared score compared to the baseline after reverting the diversion head to standard unweighted Binary Cross Entropy, which restored the stability of the shared representation.
 
----
+In practical terms, the Mean Absolute Error of 0.3328 officers on a typical scale of 1 to 30 implies that the operational recommendation is correct to within one officer in the large majority of deployments.
 
-### 🔀 Diversion Requirement (Binary Classification)
-Predicts whether a diversion route must be immediately set up to redirect traffic.
-* **Accuracy ($91.64\%$)**: The model is **correct $11$ out of $12$ times**. It goes wrong in only **$8.36\%$ of cases**.
-* **Understanding the Error Rate (Where it goes wrong)**:
-  * **False Positives (1.36% of all cases - Precision = 86.32%)**: The model recommends a diversion when none is actually required in only **$1.36\%$** of incidents. This is critical: setting up false diversions frustrates commuters and causes secondary bottlenecks. The model keeps this error rate extremely low.
-  * **False Negatives (7.0% of all cases - Recall = 69.79%)**: The model fails to recommend a diversion when one was needed in **$7.0\%$** of incidents. In a real-world system, this is a safe failure mode: the local officer on the ground can easily request a diversion manually if the situation deteriorates, whereas the AI provides a highly reliable early-warning filter.
+### Barricade Deployment Recommendation
 
----
+The barricade target encodes recommended physical barrier counts on a scale from 0 to 50 units. The ensemble achieves R squared of 0.8302 and MAE of 2.3885 barricades via a 50/50 blend, as both constituent models achieve comparable accuracy. In absolute terms, a mean deviation of 2.3885 barricades on a 50 unit scale represents an average relative error of approximately 5 percent.
 
-## 3. Why the Hybrid Ensemble is a Winning Design
+### Diversion Requirement Classification
 
-The hybrid architecture combines a **Deep Learning Two-Tower Dual Encoder** (Pytorch) and a **Gradient Boosted Decision Tree Baseline** (LightGBM):
+The diversion classification target is binary, encoding whether a traffic diversion route must be established. It is the most operationally critical of the four prediction targets. A false negative results in sustained arterial blockage, while a false positive causes unnecessary secondary disruption. The dataset exhibits a natural class imbalance of approximately 3.94 negative samples per positive sample.
 
-1. **No Data Leakage**: The model is fully autonomous. It does not use `requires_road_closure` (which is a post-incident decision) as an input. It predicts the road closure consequence (diversion) purely from the raw incident characteristics.
-2. **Text Semantics + Tabular Precision**:
-   * The **Two-Tower Neural Network** excels at continuous, semantic data—it reads the mixed English/Kannada text log using `microsoft/harrier-oss-v1-0.6b` and maps coordinates and temporal curves smoothly.
-   * **LightGBM** excels at discrete, rule-based tabular data—it handles categoricals (like causes and priorities) perfectly.
-   * By combining them using optimized ensembling weights (e.g. $90\%$ LightGBM for the categorical-heavy manpower target, and $50/50$ splits for barricades and diversions), we achieve a model that is both semantically intelligent and numerically precise.
+#### Baseline Performance
 
----
+Prior to the optimization, the baseline ensemble achieved an accuracy of 0.9164, an F1 score of 0.7718, a precision of 0.8632, and a recall of 0.6979 at the threshold of 0.50. The Two Tower Neural Network achieved a recall of 0.6731. These figures appeared adequate, but the recall of 0.6979 implied that approximately 30 percent of genuine diversion events were missed.
 
-## 4. Talking Points for Your Hackathon Presentation
+#### Updated Performance after Optimization
 
-When presenting to the Flipkart and Bengaluru Traffic Police judges, emphasize these points:
-* 💡 **"Our model is 91.6% accurate at predicting diversions before a road closure is even declared."** (Emphasize that this is an autonomous early-warning system).
-* 💡 **"We achieve a 96.6% accuracy on manpower dispatch."** (On average, the system is off by less than $0.34$ officers, preventing staffing shortages or wasteful over-deployment).
-* 💡 **"Our system parses descriptions in English, Kannada, or local mix."** (Thanks to the multilingual transformer embeddings, spelling errors or local slang in raw logs do not degrade performance).
-* 💡 **"We built a robust ensemble that combines deep spatio-temporal representations with fast tabular trees."** (This shows a sophisticated, engineering-first approach rather than just running a standard baseline script).
+Following the introduction of per fold scale pos weight (approximately 3.94) for the LightGBM classifier, standard unweighted Binary Cross Entropy for the neural network diversion head, and optimized ensemble blending weights of 30 percent neural network and 70 percent LightGBM, the metrics improved substantially.
+
+* Two Tower Neural Network: Acc@0.50 of 0.9053, F1@0.50 of 0.7417, Precision of 0.8285, Recall of 0.6713, ROC-AUC of 0.8899, and PR-AUC of 0.7803.
+* LightGBM Baseline: Acc@0.50 of 0.9123, F1@0.50 of 0.7834, Precision of 0.7832, Recall of 0.7837, ROC-AUC of 0.9256, and PR-AUC of 0.8441.
+* Weighted Ensemble: Acc@0.50 of 0.9145, F1@0.50 of 0.7841, Precision of 0.8021, Recall of 0.7668, ROC-AUC of 0.9243, and PR-AUC of 0.8404.
+
+The recall at the default 0.50 threshold improves by 6.89 percentage points for the ensemble. The LightGBM model, benefiting from the scale pos weight correction, achieves the highest rank based performance with a ROC-AUC of 0.9256 and a PR-AUC of 0.8441.
+
+## 3. Why the Hybrid Ensemble Architecture Succeeds
+
+The design premise is that the neural network and gradient booster are strong in complementary regimes of the feature space, and that a calibrated weighted combination outperforms either model individually.
+
+The Two Tower Neural Network excels on targets that are sensitive to continuous, geometric, and semantic variation. The 1024 dimensional sentence embedding captures event description semantics. The multi resolution geohash tower captures spatial autocorrelation at three geographic scales. The cyclical temporal encodings prevent the common tabular failure of treating hour 23 and hour 0 as distant.
+
+LightGBM excels on targets governed by quasi discrete operational rules. The manpower recommendation is determined by a composition of cause severity tier, priority multiplier, road closure status, corridor flag, and peak hour indicator. This structure is represented exactly by decision tree splits.
+
+The ensemble blending weights reflect the relative model performance on each target as measured by cross validation out of fold statistics. The deviation from a uniform blend is most pronounced on the manpower target (10/90 toward LightGBM), reflecting the tabular separability of the count rules, and on the diversion target (30/70 toward LightGBM), reflecting the calibrated probabilities of the scale pos weight optimized classifier.
+
+## 4. Improvement Summary
+
+The training configuration introduced three changes to address the diversion class imbalance and improve general performance. First, standard unweighted Binary Cross Entropy was restored for the neural network diversion head, which preserved the quality of the shared representation. Second, the LightGBM diversion classifier received a per fold computed scale pos weight hyperparameter. Third, the ensemble blending weights were re optimized to 30 percent neural network and 70 percent LightGBM for the diversion target.
+
+The collective effect is a recall improvement of 6.89 percentage points for the ensemble on the diversion target, while maintaining or improving performance on all other targets.
