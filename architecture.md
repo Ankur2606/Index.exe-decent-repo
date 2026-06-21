@@ -53,10 +53,10 @@ Processes categorical and textual details of the incident:
     *   `priority` $\rightarrow$ Embedding of size $(\text{vocab\_size} + 1, 8)$
     *   `veh_type` $\rightarrow$ Embedding of size $(\text{vocab\_size} + 1, 8)$
 *   **Text Embedding**: Ingests a pre-computed 1024-dimensional dense semantic embedding generated from the raw text description using the pre-trained `microsoft/harrier-oss-v1-0.6b` model.
-*   **Concatenated Incident Vector**: Concatenates categorical embeddings, `requires_road_closure` (dim=1), and description embeddings, yielding a combined dimension of:
-    $$\text{incident\_in\_dim} = 8 + 16 + 8 + 1 + 8 + 1024 = 1065$$
+*   **Concatenated Incident Vector**: Concatenates categorical embeddings and description embeddings, yielding a combined dimension of:
+    $$\text{incident\_in\_dim} = 8 + 16 + 8 + 8 + 1024 = 1064$$
 *   **Dense Feedforward Pipeline**:
-    *   `Linear(1065, 128)`
+    *   `Linear(1064, 128)`
     *   `SELU` activation
     *   `LayerNorm(128)`
     *   `Linear(128, 128)`
@@ -136,7 +136,7 @@ class PyTorchTwoTowerModel(nn.Module):
         self.embed_veh_type = nn.Embedding(vocab_sizes['veh_type'] + 1, 8)
         
         # Dense block for Incident Tower
-        incident_in_dim = 8 + 16 + 8 + 1 + 8 + text_embedding_dim
+        incident_in_dim = 8 + 16 + 8 + 8 + text_embedding_dim
         self.incident_dense = nn.Sequential(
             nn.Linear(incident_in_dim, 128),
             nn.SELU(),
@@ -187,10 +187,9 @@ class PyTorchTwoTowerModel(nn.Module):
         e_cause = self.embed_event_cause(inputs['event_cause'])
         e_prio = self.embed_priority(inputs['priority'])
         e_veh = self.embed_veh_type(inputs['veh_type'])
-        road_closure = inputs['requires_road_closure'].unsqueeze(1)
         text_emb = inputs['description_embedding']
         
-        inc_concat = torch.cat([e_type, e_cause, e_prio, road_closure, e_veh, text_emb], dim=1)
+        inc_concat = torch.cat([e_type, e_cause, e_prio, e_veh, text_emb], dim=1)
         inc_out = self.incident_dense(inc_concat)
         
         # 2. Process Context Tower

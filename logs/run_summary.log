@@ -1,0 +1,35 @@
+==================================================
+ASTraM Traffic Event Intelligence Evaluation Log
+==================================================
+
+Target Variable: EIS
+--------------------------------------------------
+Model Name                     | MAE        | RMSE       | R2-Score  
+----------------------------------------------------------------------
+Two-Tower Neural Network       | 4.2138     | 7.7630     | 0.6693    
+LightGBM Baseline              | 4.2264     | 7.4293     | 0.6972    
+Weighted Ensemble (DL+GBDT)    | 4.1101     | 7.4332     | 0.6968    
+
+Target Variable: MANPOWER
+--------------------------------------------------
+Model Name                     | MAE        | RMSE       | R2-Score  
+----------------------------------------------------------------------
+Two-Tower Neural Network       | 0.8599     | 1.7917     | 0.6553    
+LightGBM Baseline              | 0.3313     | 1.1199     | 0.8653    
+Weighted Ensemble (DL+GBDT)    | 0.3382     | 1.1372     | 0.8611    
+
+Target Variable: BARRICADES
+--------------------------------------------------
+Model Name                     | MAE        | RMSE       | R2-Score  
+----------------------------------------------------------------------
+Two-Tower Neural Network       | 2.5194     | 5.0547     | 0.8225    
+LightGBM Baseline              | 2.5827     | 5.0889     | 0.8201    
+Weighted Ensemble (DL+GBDT)    | 2.4742     | 4.9509     | 0.8297    
+
+Target Variable: DIVERSION
+--------------------------------------------------
+Model Name                     | Accuracy   | F1-Score   | Precision  | Recall    
+--------------------------------------------------------------------------------
+Two-Tower Neural Network       | 0.9029     | 0.7373     | 0.8149     | 0.6731    
+LightGBM Baseline              | 0.9161     | 0.7743     | 0.8498     | 0.7112    
+Weighted Ensemble (DL+GBDT)    | 0.9164     | 0.7718     | 0.8632     | 0.6979    

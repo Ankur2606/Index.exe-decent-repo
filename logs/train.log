@@ -1,0 +1,108 @@
+==================================================
+Starting PyTorch GPU Training Pipeline
+==================================================
+Using Device: cuda
+GPU Name: NVIDIA GeForce RTX 5070 Ti Laptop GPU
+
+--- Training PyTorch Two-Tower Dual Encoder ---
+
+👉 Training Fold 1/5...
+Epoch 01 | Train Loss: 26.1869 | Val Loss: 18.9509
+Epoch 02 | Train Loss: 16.4019 | Val Loss: 15.0431
+Epoch 03 | Train Loss: 14.7719 | Val Loss: 14.4475
+Epoch 04 | Train Loss: 14.1658 | Val Loss: 14.3017
+Epoch 05 | Train Loss: 13.6620 | Val Loss: 14.0857
+Epoch 06 | Train Loss: 13.3457 | Val Loss: 14.5759
+Epoch 07 | Train Loss: 13.2782 | Val Loss: 14.4256
+Epoch 08 | Train Loss: 13.0662 | Val Loss: 14.4278
+Epoch 09 | Train Loss: 12.4417 | Val Loss: 15.0772
+Epoch 10 | Train Loss: 12.3984 | Val Loss: 14.3010
+Epoch 11 | Train Loss: 12.2944 | Val Loss: 14.5190
+Epoch 12 | Train Loss: 11.7906 | Val Loss: 14.7770
+Epoch 13 | Train Loss: 11.6027 | Val Loss: 14.6364
+Early stopping triggered!
+
+👉 Training Fold 2/5...
+Epoch 01 | Train Loss: 25.8294 | Val Loss: 17.7936
+Epoch 02 | Train Loss: 16.4343 | Val Loss: 14.2644
+Epoch 03 | Train Loss: 14.6658 | Val Loss: 13.9061
+Epoch 04 | Train Loss: 14.2738 | Val Loss: 13.7053
+Epoch 05 | Train Loss: 13.9080 | Val Loss: 13.6540
+Epoch 06 | Train Loss: 13.5326 | Val Loss: 13.5615
+Epoch 07 | Train Loss: 13.5624 | Val Loss: 13.7984
+Epoch 08 | Train Loss: 12.9173 | Val Loss: 16.6431
+Epoch 09 | Train Loss: 13.9595 | Val Loss: 13.4362
+Epoch 10 | Train Loss: 12.4894 | Val Loss: 13.2823
+Epoch 11 | Train Loss: 12.1032 | Val Loss: 13.8048
+Epoch 12 | Train Loss: 12.0794 | Val Loss: 13.6382
+Epoch 13 | Train Loss: 11.7216 | Val Loss: 13.4486
+Epoch 14 | Train Loss: 11.3207 | Val Loss: 13.8430
+Epoch 15 | Train Loss: 11.0345 | Val Loss: 13.8136
+Epoch 16 | Train Loss: 10.7431 | Val Loss: 13.5651
+Epoch 17 | Train Loss: 10.6260 | Val Loss: 13.9329
+Epoch 18 | Train Loss: 10.4162 | Val Loss: 13.8450
+Early stopping triggered!
+
+👉 Training Fold 3/5...
+Epoch 01 | Train Loss: 27.1842 | Val Loss: 16.6769
+Epoch 02 | Train Loss: 16.4395 | Val Loss: 16.4456
+Epoch 03 | Train Loss: 15.1968 | Val Loss: 13.8233
+Epoch 04 | Train Loss: 14.3344 | Val Loss: 13.6226
+Epoch 05 | Train Loss: 13.8386 | Val Loss: 13.9595
+Epoch 06 | Train Loss: 13.6926 | Val Loss: 13.4873
+Epoch 07 | Train Loss: 13.2557 | Val Loss: 13.2388
+Epoch 08 | Train Loss: 13.2261 | Val Loss: 14.5363
+Epoch 09 | Train Loss: 12.6686 | Val Loss: 13.5224
+Epoch 10 | Train Loss: 12.4709 | Val Loss: 14.3388
+Epoch 11 | Train Loss: 13.0331 | Val Loss: 13.7266
+Epoch 12 | Train Loss: 12.1234 | Val Loss: 13.7752
+Epoch 13 | Train Loss: 11.5845 | Val Loss: 14.1077
+Epoch 14 | Train Loss: 11.2931 | Val Loss: 14.9586
+Epoch 15 | Train Loss: 12.6367 | Val Loss: 13.7968
+Early stopping triggered!
+
+👉 Training Fold 4/5...
+Epoch 01 | Train Loss: 25.4913 | Val Loss: 16.4130
+Epoch 02 | Train Loss: 15.4100 | Val Loss: 15.2186
+Epoch 03 | Train Loss: 14.6631 | Val Loss: 17.2838
+Epoch 04 | Train Loss: 14.1446 | Val Loss: 14.4905
+Epoch 05 | Train Loss: 13.7444 | Val Loss: 14.4266
+Epoch 06 | Train Loss: 13.4238 | Val Loss: 14.6592
+Epoch 07 | Train Loss: 12.9730 | Val Loss: 14.8265
+Epoch 08 | Train Loss: 13.0859 | Val Loss: 13.8681
+Epoch 09 | Train Loss: 12.5764 | Val Loss: 14.5269
+Epoch 10 | Train Loss: 12.5976 | Val Loss: 14.0714
+Epoch 11 | Train Loss: 11.9470 | Val Loss: 14.4349
+Epoch 12 | Train Loss: 11.6323 | Val Loss: 14.4610
+Epoch 13 | Train Loss: 11.4807 | Val Loss: 14.6717
+Epoch 14 | Train Loss: 11.6918 | Val Loss: 15.2839
+Epoch 15 | Train Loss: 10.9512 | Val Loss: 16.0050
+Epoch 16 | Train Loss: 10.7047 | Val Loss: 15.1873
+Early stopping triggered!
+
+👉 Training Fold 5/5...
+Epoch 01 | Train Loss: 27.1273 | Val Loss: 16.7993
+Epoch 02 | Train Loss: 16.1908 | Val Loss: 16.2732
+Epoch 03 | Train Loss: 15.1832 | Val Loss: 14.1847
+Epoch 04 | Train Loss: 14.0359 | Val Loss: 14.1530
+Epoch 05 | Train Loss: 13.6535 | Val Loss: 14.1044
+Epoch 06 | Train Loss: 13.3260 | Val Loss: 13.7302
+Epoch 07 | Train Loss: 13.2216 | Val Loss: 13.4354
+Epoch 08 | Train Loss: 12.9218 | Val Loss: 14.2550
+Epoch 09 | Train Loss: 12.6881 | Val Loss: 13.4851
+Epoch 10 | Train Loss: 12.4036 | Val Loss: 13.5661
+Epoch 11 | Train Loss: 12.0142 | Val Loss: 13.9114
+Epoch 12 | Train Loss: 11.8129 | Val Loss: 13.8779
+Epoch 13 | Train Loss: 11.7367 | Val Loss: 13.5977
+Epoch 14 | Train Loss: 11.2027 | Val Loss: 13.5029
+Epoch 15 | Train Loss: 10.9618 | Val Loss: 14.1346
+Early stopping triggered!
+OOF predictions saved to models\nn_oof_predictions.pkl
+
+--- Training LightGBM baseline classifiers & regressors ---
+Training LightGBM for target: target_eis (regression)...
+Training LightGBM for target: target_manpower (poisson)...
+Training LightGBM for target: target_barricades (poisson)...
+Training LightGBM for target: target_diversion (binary)...
+GBDT training completed!
+==================================================

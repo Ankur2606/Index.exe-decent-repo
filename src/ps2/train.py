@@ -1,4 +1,5 @@
 import os
+import sys
 import pickle
 import numpy as np
 import pandas as pd
@@ -8,6 +9,20 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 import lightgbm as lgb
+
+class DualLogger:
+    def __init__(self, filepath):
+        self.terminal = sys.stdout
+        self.log = open(filepath, "w", encoding="utf-8")
+        
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+        self.log.flush()
+        
+    def flush(self):
+        self.terminal.flush()
+        self.log.flush()
 
 # Import PyTorch model definition
 from models import PyTorchTwoTowerModel
@@ -40,7 +55,6 @@ class TrafficDataset(Dataset):
             'event_type': torch.tensor(get_cat_idx('event_type'), dtype=torch.long),
             'event_cause': torch.tensor(get_cat_idx('event_cause'), dtype=torch.long),
             'priority': torch.tensor(get_cat_idx('priority'), dtype=torch.long),
-            'requires_road_closure': torch.tensor(float(row['requires_road_closure']), dtype=torch.float32),
             'veh_type': torch.tensor(get_cat_idx('veh_type'), dtype=torch.long),
             'description_embedding': torch.tensor(self.embeddings[idx], dtype=torch.float32),
             
@@ -68,6 +82,11 @@ class TrafficDataset(Dataset):
         return item
 
 def train_pipeline():
+    logs_dir = "logs"
+    os.makedirs(logs_dir, exist_ok=True)
+    original_stdout = sys.stdout
+    sys.stdout = DualLogger(os.path.join(logs_dir, "train.log"))
+
     print("==================================================")
     print("Starting PyTorch GPU Training Pipeline")
     print("==================================================")
@@ -81,9 +100,7 @@ def train_pipeline():
     processed_csv = os.path.join("data", "processed_astram_events.csv")
     embeddings_npy = os.path.join("data", "processed_descriptions.npy")
     models_dir = "models"
-    logs_dir = "logs"
     os.makedirs(models_dir, exist_ok=True)
-    os.makedirs(logs_dir, exist_ok=True)
 
     if not os.path.exists(processed_csv) or not os.path.exists(embeddings_npy):
         print("Error: Processed dataset or embeddings not found. Run data_processing.py first.")
@@ -130,8 +147,8 @@ def train_pipeline():
     
     # Losses
     criterion_eis = nn.HuberLoss(delta=1.0)
-    criterion_manpower = nn.PoissonNLLLoss(log_input=False, full=False)
-    criterion_barricades = nn.PoissonNLLLoss(log_input=False, full=False)
+    criterion_manpower = nn.PoissonNLLLoss(log_input=False, full=True)
+    criterion_barricades = nn.PoissonNLLLoss(log_input=False, full=True)
     criterion_diversion = nn.BCELoss()
 
     for fold, (train_idx, val_idx) in enumerate(folds):
@@ -147,11 +164,13 @@ def train_pipeline():
         val_loader = DataLoader(val_dataset, batch_size=256, shuffle=False)
         
         model = PyTorchTwoTowerModel(vocab_sizes, text_embedding_dim=embeddings.shape[1]).to(device)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=7e-4, weight_decay=1e-4)
+        from torch.optim.lr_scheduler import CosineAnnealingLR
+        scheduler = CosineAnnealingLR(optimizer, T_max=25, eta_min=1e-6)
         
         best_val_loss = float('inf')
-        epochs = 20
-        patience = 6
+        epochs = 25
+        patience = 8
         patience_counter = 0
         
         for epoch in range(epochs):
@@ -210,6 +229,7 @@ def train_pipeline():
                     
             val_loss /= len(val_dataset)
             print(f"Epoch {epoch+1:02d} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
+            scheduler.step()
             
             # Early stopping and checkpoint saving
             if val_loss < best_val_loss:
@@ -257,7 +277,7 @@ def train_pipeline():
     for col in categorical_cols:
         df_gbdt[col] = df_gbdt[col].astype('category').cat.codes
         
-    tab_features = ['event_type', 'event_cause', 'priority', 'requires_road_closure', 
+    tab_features = ['event_type', 'event_cause', 'priority', 
                     'veh_type', 'latitude', 'longitude', 'corridor', 'police_station', 'zone',
                     'hour_sin', 'hour_cos', 'day_sin', 'day_cos', 'month_sin', 'month_cos', 
                     'is_weekend', 'is_peak_hour']
@@ -289,16 +309,22 @@ def train_pipeline():
             y_train, y_val = y[train_idx], y[val_idx]
             
             if task_type == 'regression':
-                gbm = lgb.LGBMRegressor(n_estimators=100, learning_rate=0.08, num_leaves=31, random_state=42, verbose=-1)
+                gbm = lgb.LGBMRegressor(n_estimators=500, learning_rate=0.04, num_leaves=31, 
+                                        subsample=0.8, colsample_bytree=0.8, subsample_freq=1,
+                                        random_state=42, verbose=-1)
             elif task_type == 'poisson':
-                gbm = lgb.LGBMRegressor(objective='poisson', n_estimators=100, learning_rate=0.08, num_leaves=31, random_state=42, verbose=-1)
+                gbm = lgb.LGBMRegressor(objective='poisson', n_estimators=500, learning_rate=0.04, num_leaves=31, 
+                                        subsample=0.8, colsample_bytree=0.8, subsample_freq=1,
+                                        random_state=42, verbose=-1)
             else:
-                gbm = lgb.LGBMClassifier(n_estimators=100, learning_rate=0.08, num_leaves=31, random_state=42, verbose=-1)
+                gbm = lgb.LGBMClassifier(n_estimators=500, learning_rate=0.04, num_leaves=31, 
+                                         subsample=0.8, colsample_bytree=0.8, subsample_freq=1,
+                                         random_state=42, verbose=-1)
                 
             gbm.fit(
                 X_train, y_train,
                 eval_set=[(X_val, y_val)],
-                callbacks=[lgb.early_stopping(stopping_rounds=10, verbose=False)]
+                callbacks=[lgb.early_stopping(stopping_rounds=20, verbose=False)]
             )
             
             gbm_path = os.path.join(models_dir, f"lgb_{target_key}_fold_{fold}.pkl")
@@ -315,6 +341,9 @@ def train_pipeline():
         pickle.dump(gbdt_val_predictions, f)
     print("GBDT training completed!")
     print("==================================================")
+    
+    # Restore stdout
+    sys.stdout = original_stdout
 
 if __name__ == "__main__":
     train_pipeline()

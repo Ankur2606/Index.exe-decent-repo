@@ -35,10 +35,13 @@ def run_evaluation():
     with open(gbdt_oof_path, "rb") as f:
         gbdt_preds = pickle.load(f)
 
-    # Compute Ensemble predictions (50-50 average)
-    ensemble_preds = {}
-    for key in targets.keys():
-        ensemble_preds[key] = 0.5 * nn_preds[key] + 0.5 * gbdt_preds[key]
+    # Compute Ensemble predictions (target-specific weights based on cross-validation performance)
+    ensemble_preds = {
+        'eis': 0.4 * nn_preds['eis'] + 0.6 * gbdt_preds['eis'],
+        'manpower': 0.1 * nn_preds['manpower'] + 0.9 * gbdt_preds['manpower'],
+        'barricades': 0.5 * nn_preds['barricades'] + 0.5 * gbdt_preds['barricades'],
+        'diversion': 0.5 * nn_preds['diversion'] + 0.5 * gbdt_preds['diversion']
+    }
 
     # Evaluate each target
     results = {}

@@ -13,8 +13,8 @@ class PyTorchTwoTowerModel(nn.Module):
         self.embed_veh_type = nn.Embedding(vocab_sizes['veh_type'] + 1, 8)
         
         # Dense block for Incident Tower
-        # total concat dim: 8 (type) + 16 (cause) + 8 (priority) + 1 (road closure flag) + 8 (veh_type) + text_embedding_dim
-        incident_in_dim = 8 + 16 + 8 + 1 + 8 + text_embedding_dim
+        # total concat dim: 8 (type) + 16 (cause) + 8 (priority) + 8 (veh_type) + text_embedding_dim
+        incident_in_dim = 8 + 16 + 8 + 8 + text_embedding_dim
         self.incident_dense = nn.Sequential(
             nn.Linear(incident_in_dim, 128),
             nn.SELU(),
@@ -84,10 +84,9 @@ class PyTorchTwoTowerModel(nn.Module):
         e_cause = self.embed_event_cause(inputs['event_cause'])
         e_prio = self.embed_priority(inputs['priority'])
         e_veh = self.embed_veh_type(inputs['veh_type'])
-        road_closure = inputs['requires_road_closure'].unsqueeze(1)
         text_emb = inputs['description_embedding']
         
-        inc_concat = torch.cat([e_type, e_cause, e_prio, road_closure, e_veh, text_emb], dim=1)
+        inc_concat = torch.cat([e_type, e_cause, e_prio, e_veh, text_emb], dim=1)
         inc_out = self.incident_dense(inc_concat)
         
         # 2. Process Context Tower
