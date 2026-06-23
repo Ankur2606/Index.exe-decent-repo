@@ -3,3 +3,14 @@ scratch
 .agents
 .env
 .venv
+
+# Node
+node_modules/
+package-lock.json
+package.json
+
+# Generated data
+data/chroma_db/
+
+# Temp deployment folder
+tmp_hf_repo/
