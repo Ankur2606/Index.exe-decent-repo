@@ -29,11 +29,28 @@ export default function VoiceDispatchPage() {
 
   const [currentPage, setCurrentPage] = useState<PageView>("gather");
   const [inputText, setInputText] = useState("");
+  const [toast, setToast] = useState<{ message: string; type: "error" | "info" | "success" } | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll chat to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [transcripts]);
+
+  // Monitor transcripts for system errors and show a toast instead of displaying in chat
+  useEffect(() => {
+    if (transcripts.length > 0) {
+      const lastLine = transcripts[transcripts.length - 1];
+      if (lastLine.text.startsWith("[SYSTEM:")) {
+        const message = lastLine.text.replace("[SYSTEM: ", "").replace("]", "");
+        setToast({ message, type: "error" });
+        
+        const timer = setTimeout(() => {
+          setToast(null);
+        }, 4000);
+        return () => clearTimeout(timer);
+      }
+    }
   }, [transcripts]);
 
   // Auto-transition to inferencing when processing starts
@@ -239,18 +256,20 @@ export default function VoiceDispatchPage() {
         ) : (
           /* Chat Bubbles */
           <div className="flex flex-col gap-2.5 py-1">
-            {transcripts.map((line, i) => (
-              <div
-                key={i}
-                className={`flex flex-col ${line.speaker === "user" ? "items-end" : "items-start"} animate-slide-up`}
-                style={{ animationDelay: `${Math.min(i * 0.03, 0.15)}s` }}
-              >
-                <div className={`chat-bubble ${line.speaker === "user" ? "chat-bubble-user" : "chat-bubble-agent"}`}>
-                  {line.text}
+            {transcripts
+              .filter((line) => !line.text.startsWith("[SYSTEM:"))
+              .map((line, i) => (
+                <div
+                  key={i}
+                  className={`flex flex-col ${line.speaker === "user" ? "items-end" : "items-start"} animate-slide-up`}
+                  style={{ animationDelay: `${Math.min(i * 0.03, 0.15)}s` }}
+                >
+                  <div className={`chat-bubble ${line.speaker === "user" ? "chat-bubble-user" : "chat-bubble-agent"}`}>
+                    {line.text}
+                  </div>
+                  <span className="text-[9px] text-[#6B7A99] font-mono mt-0.5 px-1">{line.ts}</span>
                 </div>
-                <span className="text-[9px] text-[#6B7A99] font-mono mt-0.5 px-1">{line.ts}</span>
-              </div>
-            ))}
+              ))}
             <div ref={chatEndRef} />
           </div>
         )}
@@ -276,9 +295,42 @@ export default function VoiceDispatchPage() {
             </button>
           </form>
 
+          {/* Status Label / Waveform visualizer wrapper */}
+          <div className="relative text-center mb-2.5 h-6 flex flex-col justify-center">
+            {micActive ? (
+              <div className="flex items-center justify-center gap-1.5 h-6">
+                {/* 5-bar voice wave indicator */}
+                <div className="flex items-end gap-0.5 h-4 px-1">
+                  {[0.5, 0.8, 1.0, 0.6, 0.4].map((factor, idx) => {
+                    const height = Math.max(3, Math.round(amplitude * factor * 0.15));
+                    return (
+                      <span
+                        key={idx}
+                        className="w-[2px] rounded-full bg-gradient-to-t from-[#EF4444] to-[#F97316] transition-all duration-75"
+                        style={{ height: `${height}px` }}
+                      />
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-[#EF4444] font-bold tracking-wider animate-pulse flex items-center gap-1">
+                  LISTENING — SPEAK NOW
+                </p>
+              </div>
+            ) : sessionState === "PROCESSING" ? (
+              <p className="text-[10px] text-[#7C3AED] font-bold tracking-wider animate-pulse">
+                PROCESSING SPEECH...
+              </p>
+            ) : (
+              <p className="text-[10px] text-[#6B7A99] font-mono tracking-wide uppercase">
+                Tap Mic To Speak
+              </p>
+            )}
+          </div>
+
           {/* Mic Button Row */}
           <div className="flex items-center justify-between pb-2">
             <button
+              type="button"
               onClick={handleSubmitPrediction}
               disabled={confirmedCount < 3}
               className={`text-[11px] font-mono px-3 py-2 rounded-full border transition-all touch-target ${
@@ -292,31 +344,44 @@ export default function VoiceDispatchPage() {
 
             {/* Central Mic Button */}
             <button
-              onMouseDown={() => setMicActive(true)}
-              onMouseUp={() => setMicActive(false)}
-              onTouchStart={(e) => { e.preventDefault(); setMicActive(true); }}
-              onTouchEnd={(e) => { e.preventDefault(); setMicActive(false); }}
-              className={`relative w-16 h-16 rounded-full flex items-center justify-center transition-all active:scale-90 ${
+              type="button"
+              onClick={() => setMicActive(!micActive)}
+              className={`relative w-16 h-16 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-md ${
                 micActive
-                  ? "bg-[#7C3AED] shadow-[0_0_30px_rgba(124,58,237,0.5)]"
+                  ? "bg-[#EF4444] shadow-[0_0_30px_rgba(239,68,68,0.4)] border border-[#EF4444]/30"
                   : "bg-gradient-to-br from-[#4F6EF7] to-[#7C3AED] shadow-[0_4px_20px_rgba(79,110,247,0.25)]"
               }`}
             >
               {/* Pulse rings when active */}
               {micActive && (
                 <>
-                  <span className="absolute inset-0 rounded-full border-2 border-[#7C3AED]/40 animate-pulse-ring" />
-                  <span className="absolute -inset-2 rounded-full border border-[#7C3AED]/20 animate-pulse-ring-outer" />
+                  <span
+                    className="absolute inset-0 rounded-full border-2 border-[#EF4444]/40"
+                    style={{
+                      transform: `scale(${1 + amplitude / 200})`,
+                      opacity: 1 - amplitude / 150,
+                      transition: "transform 0.15s ease-out, opacity 0.15s ease-out",
+                    }}
+                  />
+                  <span
+                    className="absolute -inset-2 rounded-full border border-[#EF4444]/25"
+                    style={{
+                      transform: `scale(${1.15 + amplitude / 150})`,
+                      opacity: 1 - amplitude / 120,
+                      transition: "transform 0.15s ease-out, opacity 0.15s ease-out",
+                    }}
+                  />
                 </>
               )}
               {micActive ? (
-                <MicOff className="w-6 h-6 text-white relative z-10" />
+                <MicOff className="w-5 h-5 text-white relative z-10" />
               ) : (
-                <Mic className="w-6 h-6 text-white relative z-10" />
+                <Mic className="w-5 h-5 text-white relative z-10" />
               )}
             </button>
 
             <button
+              type="button"
               onClick={endSession}
               className="text-[11px] font-mono px-3 py-2 rounded-full border border-[#EF4444]/20 text-[#EF4444] bg-[#EF4444]/5 touch-target active:scale-95 transition-transform"
             >
@@ -589,7 +654,19 @@ export default function VoiceDispatchPage() {
 
   /* =================== MAIN RENDER =================== */
   return (
-    <div className="h-[100dvh] w-full max-w-md mx-auto bg-[#0A0D14] text-[#F0F4FF] flex flex-col overflow-hidden font-sans">
+    <div className="h-[100dvh] w-full max-w-md mx-auto bg-[#0A0D14] text-[#F0F4FF] flex flex-col overflow-hidden font-sans relative">
+      {/* Toast Error Alert Overlay */}
+      {toast && (
+        <div className="absolute top-4 left-4 right-4 z-50 animate-slide-down">
+          <div className="backdrop-blur-md bg-red-950/80 border border-red-500/20 px-4 py-3 rounded-2xl flex items-center gap-3 shadow-lg shadow-black/50">
+            <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+            </div>
+            <p className="text-[12px] font-semibold text-red-200 leading-snug">{toast.message}</p>
+          </div>
+        </div>
+      )}
+
       {currentPage === "gather" && renderDataGatheringPage()}
       {currentPage === "inferencing" && renderInferencingPage()}
       {currentPage === "results" && renderResultsPage()}
