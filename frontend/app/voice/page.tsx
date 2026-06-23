@@ -238,6 +238,7 @@ export default function VoiceDispatchPage() {
             </div>
 
             <button
+              id="start-session-btn"
               onClick={startSession}
               className="bg-gradient-to-r from-[#4F6EF7] to-[#7C3AED] text-white font-semibold text-sm px-8 py-3 rounded-full shadow-[0_4px_20px_rgba(79,110,247,0.3)] active:scale-95 transition-transform touch-target"
             >
@@ -330,6 +331,7 @@ export default function VoiceDispatchPage() {
           {/* Mic Button Row */}
           <div className="flex items-center justify-between pb-2">
             <button
+              id="submit-session-btn"
               type="button"
               onClick={handleSubmitPrediction}
               disabled={confirmedCount < 3}
@@ -344,6 +346,7 @@ export default function VoiceDispatchPage() {
 
             {/* Central Mic Button */}
             <button
+              id="mic-toggle-btn"
               type="button"
               onClick={() => setMicActive(!micActive)}
               className={`relative w-16 h-16 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-md ${
@@ -381,6 +384,7 @@ export default function VoiceDispatchPage() {
             </button>
 
             <button
+              id="end-session-btn"
               type="button"
               onClick={endSession}
               className="text-[11px] font-mono px-3 py-2 rounded-full border border-[#EF4444]/20 text-[#EF4444] bg-[#EF4444]/5 touch-target active:scale-95 transition-transform"
