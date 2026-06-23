@@ -844,24 +844,237 @@ export default function VoiceDispatchPage() {
     );
   };
 
+  /* =================== DESKTOP SIDEBAR PANEL =================== */
+  const renderDesktopSidebar = () => {
+    const hasResults = !!prediction && sessionState === "COMPLETE";
+    const score = prediction?.event_impact_score ?? 0;
+    const severity = prediction?.severity_band ?? "";
+    const color = getSeverityColor(severity);
+    const bgColor = getSeverityBg(severity);
+    const latNum = resolvedFields.latitude ? Number(resolvedFields.latitude) : 12.96857;
+    const lonNum = resolvedFields.longitude ? Number(resolvedFields.longitude) : 77.70118;
+
+    return (
+      <aside className="hidden md:flex flex-col flex-1 h-full border-l border-[#1E2436] overflow-y-auto thin-scrollbar bg-[#080B11]">
+        {/* Sidebar Header */}
+        <div className="shrink-0 px-6 py-4 border-b border-[#1E2436] flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-[#6B7A99]">Live Operations Panel</p>
+            <p className="text-xs text-[#F0F4FF] font-semibold mt-0.5">ASTraM Intelligence Dashboard</p>
+          </div>
+          <span className={`w-2 h-2 rounded-full ${sessionState === "LISTENING" ? "bg-[#22C55E] animate-pulse" : sessionState === "COMPLETE" ? "bg-[#4F6EF7]" : "bg-[#1E2436]"}`} />
+        </div>
+
+        <div className="flex-1 p-5 space-y-4">
+
+          {/* Field Status — always visible */}
+          <div className="glass-card p-4">
+            <p className="text-[10px] uppercase tracking-wider text-[#6B7A99] font-mono mb-3">Incident Fields</p>
+            <div className="space-y-2">
+              {Object.entries(fields).map(([key, field]) => (
+                <div key={key} className="flex items-center justify-between">
+                  <span className="text-[11px] text-[#6B7A99] font-mono capitalize">{key.replace("_", " ")}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[11px] font-medium ${field.value ? "text-[#F0F4FF]" : "text-[#6B7A99]/40"}`}>
+                      {field.value || "—"}
+                    </span>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                      field.state === "confirmed" ? "bg-[#22C55E]" :
+                      field.state === "collecting" ? "bg-[#7C3AED] animate-pulse" :
+                      "bg-[#1E2436]"
+                    }`} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Progress bar */}
+            <div className="mt-3 h-1 bg-[#1E2436] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-[#4F6EF7] to-[#7C3AED] rounded-full transition-all duration-500"
+                style={{ width: `${(confirmedCount / 5) * 100}%` }}
+              />
+            </div>
+            <p className="text-[9px] font-mono text-[#6B7A99] mt-1.5 text-right">{confirmedCount}/5 confirmed</p>
+          </div>
+
+          {/* Resolved Coordinates */}
+          {resolvedFields.latitude && (
+            <div className="glass-card p-4">
+              <p className="text-[10px] uppercase tracking-wider text-[#6B7A99] font-mono mb-3">Spatial Resolution</p>
+              <div className="grid grid-cols-2 gap-3 text-[11px] font-mono">
+                {[
+                  ["Latitude", Number(resolvedFields.latitude).toFixed(5)],
+                  ["Longitude", Number(resolvedFields.longitude!).toFixed(5)],
+                  ["Zone", resolvedFields.zone || "—"],
+                  ["Corridor", resolvedFields.corridor || "—"],
+                  ["Station", resolvedFields.police_station || "—"],
+                  ["Date", resolvedFields.date || "—"],
+                ].map(([label, val]) => (
+                  <div key={label}>
+                    <span className="text-[#6B7A99] block">{label}</span>
+                    <span className="text-[#F0F4FF] block truncate">{val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Results — show when prediction is ready */}
+          {hasResults && (
+            <>
+              {/* Impact Score + Severity */}
+              <div className="glass-card p-4 flex items-center gap-5">
+                <div className="relative w-24 h-24 shrink-0">
+                  <svg viewBox="0 0 100 100" className="w-full h-full -rotate-[135deg]">
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="#1E2436" strokeWidth="7"
+                      strokeDasharray={`${2 * Math.PI * 40 * 0.75} ${2 * Math.PI * 40 * 0.25}`} strokeLinecap="round" />
+                    <circle cx="50" cy="50" r="40" fill="none" stroke={color} strokeWidth="7"
+                      strokeDasharray={`${(score / 100) * 2 * Math.PI * 40 * 0.75} ${2 * Math.PI * 40}`}
+                      strokeLinecap="round" className="score-arc"
+                      style={{ filter: `drop-shadow(0 0 6px ${color}40)` }} />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-bold" style={{ color }}>{Math.round(score)}</span>
+                    <span className="text-[8px] text-[#6B7A99] font-mono">IMPACT</span>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-2">
+                  <div className="px-3 py-1.5 rounded-full text-xs font-bold tracking-wider text-center"
+                    style={{ backgroundColor: bgColor, color, border: `1px solid ${color}30` }}>
+                    {severity} SEVERITY
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 text-center">
+                    {[
+                      { label: "Officers", val: prediction!.recommended_officers, clr: "#4F6EF7" },
+                      { label: "Barricades", val: prediction!.recommended_barricades, clr: "#F97316" },
+                      { label: "Diversion", val: prediction!.diversion_required === "YES" || prediction!.diversion_required === true ? "YES" : "NO", clr: prediction!.diversion_required === "YES" || prediction!.diversion_required === true ? "#EF4444" : "#22C55E" },
+                    ].map(({ label, val, clr }) => (
+                      <div key={label} className="bg-[#0A0D14] border border-[#1E2436] rounded-xl p-2">
+                        <span className="text-sm font-bold block" style={{ color: clr }}>{val}</span>
+                        <span className="text-[8px] text-[#6B7A99] font-mono">{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[9px] text-[#22C55E] font-mono text-right">Confidence: {prediction!.ensemble_confidence}</p>
+                </div>
+              </div>
+
+              {/* Operations Map */}
+              <div className="glass-card overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-[#1E2436] flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wider text-[#6B7A99] font-mono">Operations Radar Map</span>
+                  <div className="flex bg-[#161B2E] rounded-lg p-0.5 border border-[#1E2436]">
+                    {(["tactical", "satellite"] as const).map((view) => (
+                      <button key={view} type="button" onClick={() => setMapView(view)}
+                        className={`text-[9px] font-mono px-2.5 py-1 rounded transition-all ${mapView === view ? "bg-[#7C3AED] text-white shadow" : "text-[#6B7A99]"}`}>
+                        {view === "tactical" ? "TACTICAL" : "LIVE MAP"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="relative h-56 bg-[#0D111A] overflow-hidden">
+                  {mapView === "satellite" ? (
+                    <iframe title="Satellite Map"
+                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${lonNum - 0.005}%2C${latNum - 0.005}%2C${lonNum + 0.005}%2C${latNum + 0.005}&layer=mapnik&marker=${latNum}%2C${lonNum}`}
+                      className="w-full h-full border-none opacity-80 filter invert hue-rotate-180 brightness-90 contrast-125" />
+                  ) : (
+                    <div className="absolute inset-0 p-3 flex flex-col justify-between font-mono select-none">
+                      <div className="absolute inset-0 grid grid-cols-8 grid-rows-8 opacity-10">
+                        {Array.from({ length: 64 }).map((_, i) => <div key={i} className="border-[0.5px] border-[#4F6EF7]" />)}
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="absolute rounded-full border border-red-500/30 animate-pulse"
+                          style={{ width: `${Math.min(200, score * 2)}px`, height: `${Math.min(200, score * 2)}px`, backgroundColor: `rgba(239,68,68,${Math.min(0.2, score / 500)})`, filter: "blur(10px)" }} />
+                        <div className="bg-[#111520] border-2 border-red-500 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 shadow-[0_0_20px_rgba(239,68,68,0.4)]">
+                          <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                          <span className="text-[9px] text-[#F0F4FF] font-bold tracking-wider">ROADBLOCK DETECTED</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-start relative z-10">
+                        <span className="text-[8px] text-[#22C55E] font-bold flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse" />LIVE TELEMETRY</span>
+                        <span className="text-[8px] text-[#6B7A99] font-mono text-right">SEVERITY: {severity}</span>
+                      </div>
+                      <div className="text-center">
+                        <span className="text-[8px] text-[#6B7A99] bg-[#111520] px-2 py-0.5 rounded border border-[#1E2436]">
+                          LAT: {latNum.toFixed(5)} · LON: {lonNum.toFixed(5)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* RAG Recommendations */}
+              {recommendations.length > 0 && (
+                <div className="glass-card p-4">
+                  <p className="text-[10px] uppercase tracking-wider text-[#6B7A99] font-mono mb-3">Traffic Intelligence</p>
+                  <div className="space-y-2.5">
+                    {recommendations.map((rec, i) => (
+                      <div key={i} className="flex gap-2.5">
+                        <div className="w-5 h-5 rounded-full bg-[#4F6EF7]/15 flex items-center justify-center shrink-0 mt-0.5">
+                          <span className="text-[9px] font-bold text-[#4F6EF7]">{i + 1}</span>
+                        </div>
+                        <p className="text-[12px] text-[#F0F4FF]/80 leading-relaxed">{rec}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-2.5 pb-2">
+                <button onClick={handleExportReport}
+                  className="flex-1 flex items-center justify-center gap-2 bg-[#4F6EF7] text-white text-sm font-semibold py-3 rounded-2xl active:scale-95 transition-transform shadow-[0_4px_15px_rgba(79,110,247,0.25)] hover:bg-[#4F6EF7]/90">
+                  <Download className="w-4 h-4" /> Export Report
+                </button>
+                <button onClick={handleNewIncident}
+                  className="flex-1 flex items-center justify-center gap-2 bg-[#161B2E] border border-[#1E2436] text-[#F0F4FF] text-sm font-semibold py-3 rounded-2xl active:scale-95 transition-transform hover:border-[#2D3555]">
+                  <RotateCcw className="w-4 h-4" /> New Incident
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Empty state when no prediction yet */}
+          {!hasResults && (
+            <div className="flex flex-col items-center justify-center py-16 text-center opacity-40">
+              <Radio className="w-10 h-10 text-[#4F6EF7] mb-3" />
+              <p className="text-[12px] text-[#6B7A99] font-mono">Awaiting voice input<br />Results will appear here</p>
+            </div>
+          )}
+        </div>
+      </aside>
+    );
+  };
+
   /* =================== MAIN RENDER =================== */
   return (
-    <div className="h-[100dvh] w-full max-w-md mx-auto bg-[#0A0D14] text-[#F0F4FF] flex flex-col overflow-hidden font-sans relative">
-      {/* Toast Error Alert Overlay */}
-      {toast && (
-        <div className="absolute top-4 left-4 right-4 z-50 animate-slide-down">
-          <div className="backdrop-blur-md bg-red-950/80 border border-red-500/20 px-4 py-3 rounded-2xl flex items-center gap-3 shadow-lg shadow-black/50">
-            <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
-            </div>
-            <p className="text-[12px] font-semibold text-red-200 leading-snug">{toast.message}</p>
-          </div>
-        </div>
-      )}
+    // Mobile: centered phone shell. Desktop: full-viewport two-column split
+    <div className="h-[100dvh] w-full bg-[#0A0D14] text-[#F0F4FF] font-sans overflow-hidden
+                    md:flex md:flex-row">
 
-      {currentPage === "gather" && renderDataGatheringPage()}
-      {currentPage === "inferencing" && renderInferencingPage()}
-      {currentPage === "results" && renderResultsPage()}
+      {/* ---- LEFT PANEL: Voice Chat (phone shell on mobile, fixed-width column on desktop) ---- */}
+      <div className="h-full w-full flex flex-col overflow-hidden relative
+                      md:w-[420px] md:shrink-0 md:border-r md:border-[#1E2436]">
+        {/* Toast Error Alert Overlay */}
+        {toast && (
+          <div className="absolute top-4 left-4 right-4 z-50 animate-slide-down">
+            <div className="backdrop-blur-md bg-red-950/80 border border-red-500/20 px-4 py-3 rounded-2xl flex items-center gap-3 shadow-lg shadow-black/50">
+              <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+              </div>
+              <p className="text-[12px] font-semibold text-red-200 leading-snug">{toast.message}</p>
+            </div>
+          </div>
+        )}
+
+        {currentPage === "gather" && renderDataGatheringPage()}
+        {currentPage === "inferencing" && renderInferencingPage()}
+        {currentPage === "results" && renderResultsPage()}
+      </div>
+
+      {/* ---- RIGHT PANEL: Live Ops Dashboard (desktop only) ---- */}
+      {renderDesktopSidebar()}
     </div>
   );
 }
