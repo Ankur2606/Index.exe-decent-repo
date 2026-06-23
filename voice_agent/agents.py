@@ -4,7 +4,7 @@ import datetime
 from google.adk.agents import LlmAgent
 from voice_agent.shared_state import SharedSessionState
 from voice_agent.knowledge_base import retrieve_traffic_knowledge
-from utils.geocoder import resolve_address, find_nearest_spatial_context
+from voice_agent.geocoder import resolve_address, find_nearest_spatial_context
 
 # Shared session state reference (will be updated by the websocket session)
 active_session_state = SharedSessionState()

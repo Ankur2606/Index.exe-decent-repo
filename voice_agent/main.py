@@ -6,7 +6,6 @@ from fastapi.staticfiles import StaticFiles
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
-sys.path.append(os.path.join(PROJECT_ROOT, "streamlit_app"))
 
 # Import standard app instance from api
 from api import app
