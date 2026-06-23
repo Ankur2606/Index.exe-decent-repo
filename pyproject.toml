@@ -37,6 +37,7 @@ dependencies = [
     "uvicorn>=0.49.0",
     "requests>=2.34.2",
     "python-dotenv>=1.2.2",
+    "groq>=1.5.0",
 ]
 
 [build-system]

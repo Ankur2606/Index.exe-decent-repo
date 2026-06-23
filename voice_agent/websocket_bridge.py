@@ -2,8 +2,7 @@ import os
 import json
 import datetime
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from google import genai
-from google.genai import types
+from groq import Groq
 from voice_agent.agents import (
     get_session_state,
     set_websocket,
@@ -22,21 +21,93 @@ TOOL_MAP = {
     "submit_prediction": submit_prediction
 }
 
-# Instruction for theRequirementsAgent Chat
-SYSTEM_PROMPT = """You are ASTraM RequirementsAgent, a voice dispatcher for Bengaluru Traffic Police.
-Your task is to converse with the operator to collect 5 fields:
-1. LOCATION - Resolve the address description by calling geocode_address tool.
-2. EVENT TYPE - Determine if it is planned or unplanned.
-3. EVENT CAUSE - Identify the cause (construction, water_logging, accident, vehicle_breakdown, public_rally, vip_movement, tree_fallen, fire_incident).
-4. PRIORITY - Set to High or Low.
-5. VEHICLE TYPE - Type of vehicle involved.
+# Define schemas for Groq (OpenAI-compatible)
+GROQ_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "geocode_address",
+            "description": "Geocode an address description to coordinate points and administrative boundaries.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "address": {
+                        "type": "string",
+                        "description": "The text description of the location (e.g. HAL Old Airport Road)."
+                    }
+                },
+                "required": ["address"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_field",
+            "description": "Update a specific incident field in the shared state.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "field_name": {
+                        "type": "string",
+                        "enum": ["location", "event_type", "event_cause", "priority", "vehicle_type"],
+                        "description": "Name of the field to update."
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "The value to assign to the field."
+                    }
+                },
+                "required": ["field_name", "value"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "submit_prediction",
+            "description": "Submit the collected incident details to run the ML congestion prediction. Call this once all required fields are collected.",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    }
+]
 
-Instructions:
-* Speak professionally and concisely.
-* If the operator provides an address, call geocode_address first.
-* Once a field value is identified, call update_field with the field_name and value.
-* Guide the operator to collect missing fields.
-* Once you have collected all fields, confirm them with the operator and call submit_prediction."""
+# Prompt instructing LLM on requirement gathering with options
+SYSTEM_PROMPT = """You are ASTraM RequirementsAgent, an expert traffic incident voice dispatcher helper for Bengaluru Traffic Police.
+Your primary objective is to gather exactly 5 core variables from the operator's voice reports through a back-and-forth conversation before triggering the dispatch calculation.
+
+The 5 target variables and their exact allowed options are:
+1. LOCATION: The address description. Call `geocode_address` immediately once the operator mentions a location.
+2. EVENT_TYPE: Must be exactly one of: 'planned' or 'unplanned'.
+3. EVENT_CAUSE: Must be exactly one of: 'construction', 'water_logging', 'accident', 'vehicle_breakdown', 'public_rally', 'vip_movement', 'tree_fallen', 'fire_incident'.
+4. PRIORITY: Must be exactly one of: 'High' or 'Low'.
+5. VEHICLE_TYPE: Type of vehicle involved (e.g. 'two_wheeler', 'bus', 'car', 'auto', 'truck', 'unknown').
+
+Rules for Requirement Gathering:
+* Speak briefly, professionally, and extremely concisely. Your text output will be read aloud via Text-to-Speech (TTS), so keep your response under 25-35 words to save time and API tokens.
+* Check which of the 5 variables are missing.
+* If variables are missing, ask for them one by one. Always list the exact allowed options in parentheses to guide the operator (e.g. "What is the priority (High or Low)?" or "What is the cause (construction, water_logging, accident, vehicle_breakdown, public_rally, vip_movement, tree_fallen, fire_incident)?").
+* Once you identify a field value, call `update_field` immediately to confirm it in the system.
+* DO NOT call `submit_prediction` until you have gathered and updated all 5 variables. Once all 5 variables are resolved, confirm the details with the operator and call `submit_prediction` to finalize the dispatch.
+* When you call `submit_prediction`, simply respond with 'Calculating dispatch metrics now.' and nothing else. The system will automatically output and narrate the official dispatch report."""
+
+async def generate_and_send_tts(websocket: WebSocket, text: str, groq_client: Groq):
+    try:
+        print(f"Generating TTS for: '{text}'")
+        response = groq_client.audio.speech.create(
+            model="canopylabs/orpheus-v1-english",
+            voice="troy",
+            input=text,
+            response_format="wav"
+        )
+        audio_bytes = response.read()
+        await websocket.send_bytes(audio_bytes)
+        print("TTS audio bytes sent over WS.")
+    except Exception as e:
+        print(f"Failed to generate TTS: {e}")
 
 @router.websocket("/ws/voice-session")
 async def websocket_endpoint(websocket: WebSocket, lang: str = "EN"):
@@ -49,26 +120,20 @@ async def websocket_endpoint(websocket: WebSocket, lang: str = "EN"):
     state = get_session_state()
     state.reset()
     
-    # Initialize the GenAI Client and Chat Session
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
+    # Initialize the Groq Client
+    groq_key = os.getenv("GROQ_API_KEY")
+    if not groq_key:
         await websocket.send_text(json.dumps({
             "type": "error",
-            "message": "GEMINI_API_KEY not configured. Please set it in HF Space Settings > Secrets."
+            "message": "GROQ_API_KEY not configured. Please set it in your .env or HF Space Settings > Secrets."
         }))
-        await websocket.close(code=1008, reason="Missing GEMINI_API_KEY")
+        await websocket.close(code=1008, reason="Missing GROQ_API_KEY")
         return
-    
-    genai_client = genai.Client(api_key=api_key)
         
-    chat = genai_client.chats.create(
-        model="gemini-3.1-flash-live-preview",
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-            tools=[geocode_address, update_field, submit_prediction],
-            temperature=0.2
-        )
-    )
+    groq_client = Groq(api_key=groq_key)
+    chat_history = [
+        {"role": "system", "content": SYSTEM_PROMPT}
+    ]
     
     # Send a greeting transcript line from system
     ts = datetime.datetime.now().strftime("%H:%M:%S")
@@ -85,6 +150,7 @@ async def websocket_endpoint(websocket: WebSocket, lang: str = "EN"):
         "text": greeting,
         "ts": ts
     }))
+    await generate_and_send_tts(websocket, greeting, groq_client)
 
     try:
         while True:
@@ -106,35 +172,67 @@ async def websocket_endpoint(websocket: WebSocket, lang: str = "EN"):
                     "ts": ts
                 }))
                 
-                # Send to Gemini chat session
-                response = chat.send_message(user_text)
+                chat_history.append({"role": "user", "content": user_text})
                 
-                # Tool calling resolution loop (handles synchronous function calls)
-                while response.function_calls:
-                    tool_responses = []
-                    for call in response.function_calls:
-                        name = call.name
-                        args = call.args
-                        
-                        if name in TOOL_MAP:
-                            tool_result = TOOL_MAP[name](**args)
-                            tool_responses.append(
-                                types.Part.from_function_response(
-                                    name=name,
-                                    response={"result": tool_result}
-                                )
-                            )
+                try:
+                    response = groq_client.chat.completions.create(
+                        model="openai/gpt-oss-120b",
+                        messages=chat_history,
+                        tools=GROQ_TOOLS,
+                        tool_choice="auto",
+                        temperature=0.2
+                    )
+                    
+                    response_message = response.choices[0].message
+                    chat_history.append(response_message)
+                    
+                    # Tool calling resolution loop
+                    while response_message.tool_calls:
+                        for tool_call in response_message.tool_calls:
+                            function_name = tool_call.function.name
+                            function_args = json.loads(tool_call.function.arguments)
                             
-                    response = chat.send_message(tool_responses)
-                
-                # Send agent response text back to client
-                if response.text:
+                            if function_name in TOOL_MAP:
+                                tool_result = TOOL_MAP[function_name](**function_args)
+                                chat_history.append({
+                                    "role": "tool",
+                                    "tool_call_id": tool_call.id,
+                                    "name": function_name,
+                                    "content": json.dumps({"result": tool_result})
+                                })
+                        
+                        # Get new completion from Groq with tool outputs
+                        response = groq_client.chat.completions.create(
+                            model="openai/gpt-oss-120b",
+                            messages=chat_history,
+                            tools=GROQ_TOOLS,
+                            tool_choice="auto",
+                            temperature=0.2
+                        )
+                        response_message = response.choices[0].message
+                        chat_history.append(response_message)
+                    
+                    # Send agent response text back to client
+                    agent_text = response_message.content
+                    if agent_text:
+                        ts = datetime.datetime.now().strftime("%H:%M:%S")
+                        state.add_transcript("agent", agent_text, ts)
+                        await websocket.send_text(json.dumps({
+                            "type": "transcript",
+                            "speaker": "agent",
+                            "text": agent_text,
+                            "ts": ts
+                        }))
+                        await generate_and_send_tts(websocket, agent_text, groq_client)
+                        
+                except Exception as e:
+                    print(f"Error in Groq Chat: {e}")
+                    err_msg = "Error communicating with Groq API."
                     ts = datetime.datetime.now().strftime("%H:%M:%S")
-                    state.add_transcript("agent", response.text, ts)
                     await websocket.send_text(json.dumps({
                         "type": "transcript",
                         "speaker": "agent",
-                        "text": response.text,
+                        "text": err_msg,
                         "ts": ts
                     }))
                     
@@ -143,7 +241,7 @@ async def websocket_endpoint(websocket: WebSocket, lang: str = "EN"):
                 submit_prediction()
                 
             elif message.get("type") == "inject_preset":
-                # Inject a preset test case with 100 percent diversion required matching coordinates
+                # Inject a preset test case
                 ts = datetime.datetime.now().strftime("%H:%M:%S")
                 
                 # 1. Update shared state
@@ -190,14 +288,29 @@ async def websocket_endpoint(websocket: WebSocket, lang: str = "EN"):
                 submit_prediction()
                 
             elif message.get("type") == "replay_audio":
-                # Simulated audio replay notification
+                # Narrate the last agent transcript using Groq TTS
+                last_agent_text = ""
+                for line in reversed(state.get_state().get("transcripts", [])):
+                    if line.get("speaker") == "agent":
+                        last_agent_text = line.get("text", "")
+                        break
+                
                 ts = datetime.datetime.now().strftime("%H:%M:%S")
-                await websocket.send_text(json.dumps({
-                    "type": "transcript",
-                    "speaker": "agent",
-                    "text": "[REPLAYING LAST AUDIO SEGMENT]",
-                    "ts": ts
-                }))
+                if last_agent_text:
+                    await websocket.send_text(json.dumps({
+                        "type": "transcript",
+                        "speaker": "agent",
+                        "text": f"[REPLAYING AUDIO: \"{last_agent_text}\"]",
+                        "ts": ts
+                    }))
+                    await generate_and_send_tts(websocket, last_agent_text, groq_client)
+                else:
+                    await websocket.send_text(json.dumps({
+                        "type": "transcript",
+                        "speaker": "agent",
+                        "text": "[NO AUDIO TO REPLAY]",
+                        "ts": ts
+                    }))
                 
     except WebSocketDisconnect:
         print("WebSocket client disconnected")

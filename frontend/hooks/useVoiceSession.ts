@@ -167,6 +167,7 @@ export function useVoiceSession() {
     const wsUrl = `${protocol}//${host}/ws/voice-session?lang=${language}`;
 
     const ws = new WebSocket(wsUrl);
+    ws.binaryType = "blob";
     socketRef.current = ws;
 
     ws.onopen = () => {
@@ -174,6 +175,17 @@ export function useVoiceSession() {
     };
 
     ws.onmessage = (event) => {
+      // Handle binary audio frame playback from Groq TTS
+      if (event.data instanceof Blob) {
+        console.log("Received binary audio frame from backend");
+        const url = URL.createObjectURL(event.data);
+        const audio = new Audio(url);
+        audio.play().catch((err) => {
+          console.error("Audio playback error:", err);
+        });
+        return;
+      }
+
       try {
         const msg = JSON.parse(event.data) as WsMessage;
         switch (msg.type) {

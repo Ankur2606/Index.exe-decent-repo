@@ -17,6 +17,30 @@ def set_websocket(ws):
     global active_websocket
     active_websocket = ws
 
+async def generate_and_send_tts_async(text: str):
+    global active_websocket
+    if not active_websocket:
+        return
+    try:
+        from groq import Groq
+        groq_key = os.getenv("GROQ_API_KEY")
+        if not groq_key:
+            print("GROQ_API_KEY not configured. Skip narration audio.")
+            return
+        client = Groq(api_key=groq_key)
+        print(f"Generating async TTS: '{text}'")
+        response = client.audio.speech.create(
+            model="canopylabs/orpheus-v1-english",
+            voice="troy",
+            input=text,
+            response_format="wav"
+        )
+        audio_bytes = response.read()
+        await active_websocket.send_bytes(audio_bytes)
+        print("Async TTS audio bytes sent successfully.")
+    except Exception as e:
+        print(f"Failed to generate async TTS: {e}")
+
 async def emit_ws_event(event_dict):
     global active_websocket
     if active_websocket:
@@ -149,6 +173,26 @@ def submit_prediction() -> dict:
             # Now run RAG Agent in background to populate recommendations
             run_rag_recommendations_pipeline(payload, predictions)
             
+            # Emit text summary transcript and trigger async TTS narration
+            summary_text = (
+                f"Incident confirmed at {session_data['fields']['location'] or 'location'}. "
+                f"Event: {session_data['fields']['event_type'] or 'unplanned'} caused by {session_data['fields']['event_cause'] or 'others'}. "
+                f"Priority: {session_data['fields']['priority'] or 'High'}. "
+                f"Deploy {predictions['recommended_officers']} officers and {predictions['recommended_barricades']} barricades. "
+                f"Diversion required: {predictions['diversion_required']}."
+            )
+            
+            if loop.is_running():
+                ts_now = datetime.datetime.now().strftime("%H:%M:%S")
+                state.add_transcript("agent", summary_text, ts_now)
+                asyncio.run_coroutine_threadsafe(emit_ws_event({
+                    "type": "transcript",
+                    "speaker": "agent",
+                    "text": summary_text,
+                    "ts": ts_now
+                }), loop)
+                asyncio.run_coroutine_threadsafe(generate_and_send_tts_async(summary_text), loop)
+                
             return predictions
         else:
             raise Exception(f"Inference server returned status code {response.status_code}")
@@ -167,6 +211,26 @@ def submit_prediction() -> dict:
         if loop.is_running():
             asyncio.run_coroutine_threadsafe(emit_ws_event({"type": "prediction_result", "data": fallback}), loop)
         run_rag_recommendations_pipeline(payload, fallback)
+        
+        # Emit text summary transcript and trigger async TTS narration
+        summary_text = (
+            f"Incident confirmed at {session_data['fields']['location'] or 'location'}. "
+            f"Event: {session_data['fields']['event_type'] or 'unplanned'} caused by {session_data['fields']['event_cause'] or 'others'}. "
+            f"Priority: {session_data['fields']['priority'] or 'High'}. "
+            f"Deploy {fallback['recommended_officers']} officers and {fallback['recommended_barricades']} barricades. "
+            f"Diversion required: {fallback['diversion_required']}."
+        )
+        if loop.is_running():
+            ts_now = datetime.datetime.now().strftime("%H:%M:%S")
+            state.add_transcript("agent", summary_text, ts_now)
+            asyncio.run_coroutine_threadsafe(emit_ws_event({
+                "type": "transcript",
+                "speaker": "agent",
+                "text": summary_text,
+                "ts": ts_now
+            }), loop)
+            asyncio.run_coroutine_threadsafe(generate_and_send_tts_async(summary_text), loop)
+            
         return fallback
 
 # RAG Agent retrieval and execution
@@ -205,7 +269,7 @@ def run_rag_recommendations_pipeline(payload: dict, predictions: dict):
 # Define Google ADK LlmAgents
 requirements_agent = LlmAgent(
     name="requirements_agent",
-    model="gemini-3.1-flash-live-preview",
+    model="openai/gpt-oss-120b",
     instruction="""You are ASTraM RequirementsAgent, a voice dispatcher helper for Bengaluru Traffic Police.
 Your task is to converse with the operator to collect 5 fields:
 1. LOCATION - Resolve the address description by calling geocode_address.
@@ -224,14 +288,14 @@ Conversation style:
 
 rag_agent = LlmAgent(
     name="rag_agent",
-    model="gemini-3-flash",
+    model="openai/gpt-oss-20b",
     instruction="""You are ASTraM RAGAgent.
 Analyze the incident fields and retrieve traffic directives from knowledge database to output grounded operational recommendations."""
 )
 
 narrator_agent = LlmAgent(
     name="narrator_agent",
-    model="gemini-3.1-flash-live-preview",
+    model="openai/gpt-oss-120b",
     instruction="""You are ASTraM NarratorAgent.
 Summarize the predicted impact score and recommended resources aloud to the operator in the active session language."""
 )
