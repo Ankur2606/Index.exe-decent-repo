@@ -1,17 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useVoiceSession } from "../../hooks/useVoiceSession";
-import WaveformRing from "../../components/WaveformRing";
-import TranscriptScroll from "../../components/TranscriptScroll";
-import FieldCard from "../../components/FieldCard";
-import GaugeCard from "../../components/GaugeCard";
-import MetricCard from "../../components/MetricCard";
-import RecommendationList from "../../components/RecommendationList";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { ChevronDown, ChevronUp, Play, Square, RefreshCw, Download, Layers } from "lucide-react";
+import { Mic, MicOff, Send, ChevronDown, Download, RotateCcw, Shield, Users, Construction, AlertTriangle, Layers, Radio } from "lucide-react";
+
+type PageView = "gather" | "inferencing" | "results";
 
 export default function VoiceDispatchPage() {
   const {
@@ -31,29 +24,40 @@ export default function VoiceDispatchPage() {
     endSession,
     sendUserVoiceMessage,
     injectPresetTestCase,
-    replayLastAudio,
     handleSubmitPrediction,
   } = useVoiceSession();
 
-  const [autoResolvedExpanded, setAutoResolvedExpanded] = useState(false);
+  const [currentPage, setCurrentPage] = useState<PageView>("gather");
   const [inputText, setInputText] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Format session countdown timer
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [transcripts]);
+
+  // Auto-transition to inferencing when processing starts
+  useEffect(() => {
+    if (sessionState === "PROCESSING") {
+      setCurrentPage("inferencing");
+    }
+  }, [sessionState]);
+
+  // Auto-transition to results when prediction arrives
+  useEffect(() => {
+    if (prediction && sessionState === "COMPLETE") {
+      setCurrentPage("results");
+    }
+  }, [prediction, sessionState]);
+
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60);
     const remainder = secs % 60;
     return `${mins}:${remainder < 10 ? "0" : ""}${remainder}`;
   };
 
-  // Count confirmed fields
-  const getConfirmedFieldsCount = () => {
-    return Object.values(fields).filter((f) => f.state === "confirmed").length;
-  };
+  const confirmedCount = Object.values(fields).filter((f) => f.state === "confirmed").length;
 
-  const confirmedCount = getConfirmedFieldsCount();
-  const progressPercent = (confirmedCount / 5) * 100;
-
-  // Handle manual typing of transcript for fallback simulation
   const handleSendText = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputText.trim()) {
@@ -62,7 +66,11 @@ export default function VoiceDispatchPage() {
     }
   };
 
-  // Export predictions as JSON dispatch report
+  const handleNewIncident = () => {
+    endSession();
+    setCurrentPage("gather");
+  };
+
   const handleExportReport = () => {
     if (!prediction) return;
     const report = {
@@ -76,321 +84,515 @@ export default function VoiceDispatchPage() {
       },
       resolved: resolvedFields,
       predictions: prediction,
-      recommendations: recommendations,
+      recommendations,
     };
-
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `astram_dispatch_report_${Date.now()}.json`;
+    link.download = `astram_dispatch_${Date.now()}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
 
-  return (
-    <TooltipProvider>
-      <div className="min-h-screen bg-[#0A0D14] text-[#F0F4FF] flex flex-col font-sans">
-        {/* ZONE A: Header Bar */}
-        <header className="h-14 border-b border-[#1E2436] bg-[#111520] px-6 flex items-center justify-between z-10 shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="font-bold text-lg tracking-wider text-[#F0F4FF] flex items-center gap-1.5">
-              ASTraM <span className="text-xs px-2 py-0.5 rounded bg-[#7C3AED]/20 text-[#7C3AED] border border-[#7C3AED]/30">Voice Dispatch</span>
+  // Severity color mapping
+  const getSeverityColor = (band: string) => {
+    switch (band) {
+      case "LOW": return "#22C55E";
+      case "MODERATE": return "#EAB308";
+      case "HIGH": return "#F97316";
+      case "CRITICAL": return "#EF4444";
+      default: return "#4F6EF7";
+    }
+  };
+
+  const getSeverityBg = (band: string) => {
+    switch (band) {
+      case "LOW": return "rgba(34,197,94,0.12)";
+      case "MODERATE": return "rgba(234,179,8,0.12)";
+      case "HIGH": return "rgba(249,115,22,0.12)";
+      case "CRITICAL": return "rgba(239,68,68,0.12)";
+      default: return "rgba(79,110,247,0.12)";
+    }
+  };
+
+  /* =================== PAGE 1: DATA GATHERING =================== */
+  const renderDataGatheringPage = () => (
+    <div className="flex flex-col h-full page-enter">
+      {/* Top Bar */}
+      <header className="shrink-0 px-4 pt-3 pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#4F6EF7] to-[#7C3AED] flex items-center justify-center">
+              <Shield className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h1 className="text-sm font-bold tracking-wide">ASTraM</h1>
+              <p className="text-[10px] text-[#6B7A99] font-mono">Voice Dispatch System</p>
+            </div>
+          </div>
+
+          {/* Language Pills */}
+          <div className="flex items-center gap-1">
+            {["EN", "HI", "KA"].map((lang) => (
+              <button
+                key={lang}
+                onClick={() => changeLanguage(lang)}
+                className={`text-[11px] px-2.5 py-1 rounded-full font-semibold transition-all touch-target flex items-center justify-center ${
+                  language === lang
+                    ? "bg-[#7C3AED] text-white shadow-[0_0_12px_rgba(124,58,237,0.3)]"
+                    : "bg-[#161B2E] text-[#6B7A99]"
+                }`}
+              >
+                {lang === "HI" ? "हिं" : lang === "KA" ? "ಕ" : "EN"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Session Status + Timer */}
+        {sessionState !== "READY" && (
+          <div className="flex items-center justify-between mt-2 animate-slide-down">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${
+                sessionState === "LISTENING" ? "bg-[#22C55E] animate-pulse" : "bg-[#6B7A99]"
+              }`} />
+              <span className="text-[11px] font-mono text-[#6B7A99]">{sessionState}</span>
+            </div>
+            <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full ${
+              sessionTime < 120
+                ? "bg-[#EF4444]/15 text-[#EF4444] animate-pulse"
+                : "text-[#6B7A99]"
+            }`}>
+              {formatTime(sessionTime)}
             </span>
           </div>
+        )}
+      </header>
 
-          {/* Session Status Pill */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-[#161B2E] border border-[#1E2436] px-3 py-1 rounded-full text-xs font-mono">
-              <span className={`w-2.5 h-2.5 rounded-full ${
-                sessionState === "LISTENING"
-                  ? "bg-[#22C55E] animate-ping"
-                  : sessionState === "PROCESSING"
-                  ? "bg-[#7C3AED] animate-pulse"
-                  : sessionState === "COMPLETE"
-                  ? "bg-[#4F6EF7]"
-                  : "bg-[#6B7A99]"
-              }`} />
-              <span className="text-[#F0F4FF]">{sessionState}</span>
+      {/* Field Status Chips */}
+      {sessionState !== "READY" && (
+        <div className="shrink-0 px-4 pb-2 animate-slide-down">
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {Object.entries(fields).map(([key, field]) => (
+              <div
+                key={key}
+                className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-mono border transition-all ${
+                  field.state === "confirmed"
+                    ? "bg-[#22C55E]/15 border-[#22C55E]/30 text-[#22C55E]"
+                    : field.state === "collecting"
+                    ? "bg-[#7C3AED]/15 border-[#7C3AED]/30 text-[#7C3AED] animate-pulse"
+                    : "bg-[#161B2E] border-[#1E2436] text-[#6B7A99]"
+                }`}
+              >
+                {field.state === "confirmed" ? "✓ " : ""}{key.replace("_", " ")}
+              </div>
+            ))}
+          </div>
+          {/* Progress bar */}
+          <div className="mt-1.5 h-1 bg-[#1E2436] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-[#4F6EF7] to-[#7C3AED] rounded-full transition-all duration-500"
+              style={{ width: `${(confirmedCount / 5) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Chat / Transcript Area */}
+      <div className="flex-1 overflow-y-auto px-4 py-2 thin-scrollbar">
+        {sessionState === "READY" ? (
+          /* Start Screen */
+          <div className="h-full flex flex-col items-center justify-center text-center px-4 gap-6">
+            {/* Animated Logo Ring */}
+            <div className="relative w-32 h-32">
+              <div className="absolute inset-0 rounded-full border-2 border-[#4F6EF7]/20 animate-pulse-ring-outer" />
+              <div className="absolute inset-3 rounded-full border-2 border-[#7C3AED]/30 animate-pulse-ring" />
+              <div className="absolute inset-6 rounded-full bg-gradient-to-br from-[#4F6EF7] to-[#7C3AED] flex items-center justify-center shadow-[0_0_40px_rgba(124,58,237,0.25)]">
+                <Radio className="w-10 h-10 text-white" />
+              </div>
             </div>
 
-            {sessionState !== "READY" && (
-              <div className={`text-xs font-mono px-3 py-1 rounded-full border ${
-                sessionTime < 120
-                  ? "bg-[#EF4444]/15 text-[#EF4444] border-[#EF4444]/30 animate-pulse"
-                  : "bg-[#161B2E] text-[#6B7A99] border-[#1E2436]"
-              }`}>
-                Timer: {formatTime(sessionTime)}
-              </div>
-            )}
+            <div>
+              <h2 className="text-xl font-bold mb-1">Incident Dispatch</h2>
+              <p className="text-[13px] text-[#6B7A99] leading-relaxed max-w-[260px]">
+                Tap the mic or type to report a traffic incident. The AI agent will guide you through data collection.
+              </p>
+            </div>
 
-            {/* PRESET INJECTOR BUTTON (Required to demonstrate diversion prediction) */}
-            <Button
-              size="sm"
+            <button
+              onClick={startSession}
+              className="bg-gradient-to-r from-[#4F6EF7] to-[#7C3AED] text-white font-semibold text-sm px-8 py-3 rounded-full shadow-[0_4px_20px_rgba(79,110,247,0.3)] active:scale-95 transition-transform touch-target"
+            >
+              START SESSION
+            </button>
+
+            {/* Preset test button */}
+            <button
               onClick={injectPresetTestCase}
-              className="bg-[#EF4444]/10 hover:bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30 font-mono text-xs h-7 px-3 flex items-center gap-1.5"
+              className="flex items-center gap-1.5 text-[11px] text-[#EF4444] font-mono border border-[#EF4444]/20 bg-[#EF4444]/5 px-3 py-1.5 rounded-full active:scale-95 transition-transform"
             >
-              <Layers className="w-3.5 h-3.5" />
-              <span>TEST PRESET DISPATCH</span>
-            </Button>
+              <Layers className="w-3 h-3" />
+              DEMO PRESET
+            </button>
           </div>
+        ) : (
+          /* Chat Bubbles */
+          <div className="flex flex-col gap-2.5 py-1">
+            {transcripts.map((line, i) => (
+              <div
+                key={i}
+                className={`flex flex-col ${line.speaker === "user" ? "items-end" : "items-start"} animate-slide-up`}
+                style={{ animationDelay: `${Math.min(i * 0.03, 0.15)}s` }}
+              >
+                <div className={`chat-bubble ${line.speaker === "user" ? "chat-bubble-user" : "chat-bubble-agent"}`}>
+                  {line.text}
+                </div>
+                <span className="text-[9px] text-[#6B7A99] font-mono mt-0.5 px-1">{line.ts}</span>
+              </div>
+            ))}
+            <div ref={chatEndRef} />
+          </div>
+        )}
+      </div>
 
-          {/* Language Selector */}
-          <div className="flex items-center gap-1.5">
+      {/* Bottom Input Area */}
+      {sessionState !== "READY" && (
+        <div className="shrink-0 border-t border-[#1E2436] bg-[#0A0D14] px-4 pt-3 safe-bottom">
+          {/* Text input row */}
+          <form onSubmit={handleSendText} className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="Type incident details..."
+              className="flex-1 bg-[#161B2E] border border-[#1E2436] rounded-full px-4 py-2.5 text-sm text-[#F0F4FF] focus:outline-none focus:border-[#4F6EF7] placeholder-[#6B7A99]"
+            />
             <button
-              onClick={() => changeLanguage("HI")}
-              className={`text-xs px-2.5 py-1 rounded font-semibold transition-all ${
-                language === "HI"
-                  ? "bg-[#7C3AED] text-white"
-                  : "bg-[#161B2E] text-[#6B7A99] hover:bg-[#1E2436]"
+              type="submit"
+              className="w-10 h-10 rounded-full bg-[#4F6EF7] flex items-center justify-center shrink-0 active:scale-90 transition-transform touch-target"
+            >
+              <Send className="w-4 h-4 text-white" />
+            </button>
+          </form>
+
+          {/* Mic Button Row */}
+          <div className="flex items-center justify-between pb-2">
+            <button
+              onClick={handleSubmitPrediction}
+              disabled={confirmedCount < 3}
+              className={`text-[11px] font-mono px-3 py-2 rounded-full border transition-all touch-target ${
+                confirmedCount >= 3
+                  ? "bg-[#7C3AED]/15 border-[#7C3AED]/30 text-[#7C3AED] active:scale-95"
+                  : "bg-[#161B2E] border-[#1E2436] text-[#6B7A99]/40 cursor-not-allowed"
               }`}
             >
-              हिं
+              SUBMIT ({confirmedCount}/5)
             </button>
+
+            {/* Central Mic Button */}
             <button
-              onClick={() => changeLanguage("EN")}
-              className={`text-xs px-2.5 py-1 rounded font-semibold transition-all ${
-                language === "EN"
-                  ? "bg-[#7C3AED] text-white"
-                  : "bg-[#161B2E] text-[#6B7A99] hover:bg-[#1E2436]"
+              onMouseDown={() => setMicActive(true)}
+              onMouseUp={() => setMicActive(false)}
+              onTouchStart={(e) => { e.preventDefault(); setMicActive(true); }}
+              onTouchEnd={(e) => { e.preventDefault(); setMicActive(false); }}
+              className={`relative w-16 h-16 rounded-full flex items-center justify-center transition-all active:scale-90 ${
+                micActive
+                  ? "bg-[#7C3AED] shadow-[0_0_30px_rgba(124,58,237,0.5)]"
+                  : "bg-gradient-to-br from-[#4F6EF7] to-[#7C3AED] shadow-[0_4px_20px_rgba(79,110,247,0.25)]"
               }`}
             >
-              EN
+              {/* Pulse rings when active */}
+              {micActive && (
+                <>
+                  <span className="absolute inset-0 rounded-full border-2 border-[#7C3AED]/40 animate-pulse-ring" />
+                  <span className="absolute -inset-2 rounded-full border border-[#7C3AED]/20 animate-pulse-ring-outer" />
+                </>
+              )}
+              {micActive ? (
+                <MicOff className="w-6 h-6 text-white relative z-10" />
+              ) : (
+                <Mic className="w-6 h-6 text-white relative z-10" />
+              )}
             </button>
+
             <button
-              onClick={() => changeLanguage("KA")}
-              className={`text-xs px-2.5 py-1 rounded font-semibold transition-all ${
-                language === "KA"
-                  ? "bg-[#7C3AED] text-white"
-                  : "bg-[#161B2E] text-[#6B7A99] hover:bg-[#1E2436]"
-              }`}
+              onClick={endSession}
+              className="text-[11px] font-mono px-3 py-2 rounded-full border border-[#EF4444]/20 text-[#EF4444] bg-[#EF4444]/5 touch-target active:scale-95 transition-transform"
             >
-              ಕ
+              END
             </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  /* =================== PAGE 2: INFERENCING =================== */
+  const renderInferencingPage = () => (
+    <div className="flex flex-col h-full items-center justify-center px-6 text-center page-enter">
+      {/* Radar Animation */}
+      <div className="relative w-44 h-44 mb-8">
+        {/* Outer ring */}
+        <div className="absolute inset-0 rounded-full border border-[#4F6EF7]/15" />
+        {/* Middle ring */}
+        <div className="absolute inset-6 rounded-full border border-[#4F6EF7]/25" />
+        {/* Inner ring */}
+        <div className="absolute inset-12 rounded-full border border-[#7C3AED]/35" />
+        {/* Center dot */}
+        <div className="absolute inset-[68px] rounded-full bg-[#7C3AED] shadow-[0_0_20px_rgba(124,58,237,0.5)] animate-breathe" />
+        {/* Sweep line */}
+        <div className="absolute inset-0 animate-radar" style={{ transformOrigin: "center" }}>
+          <div className="absolute top-1/2 left-1/2 w-1/2 h-[2px] bg-gradient-to-r from-[#7C3AED] to-transparent origin-left" />
+        </div>
+        {/* Pulsing rings */}
+        <div className="absolute inset-0 rounded-full border-2 border-[#4F6EF7]/20 animate-pulse-ring" />
+        <div className="absolute -inset-4 rounded-full border border-[#4F6EF7]/10 animate-pulse-ring-outer" />
+      </div>
+
+      <h2 className="text-lg font-bold mb-1 animate-fade-in">Analyzing Incident</h2>
+      <p className="text-[13px] text-[#6B7A99] mb-6 animate-fade-in">Running ML prediction pipeline...</p>
+
+      {/* Loading dots */}
+      <div className="flex gap-2 mb-8">
+        <span className="w-2.5 h-2.5 rounded-full bg-[#4F6EF7] loading-dot" />
+        <span className="w-2.5 h-2.5 rounded-full bg-[#7C3AED] loading-dot" />
+        <span className="w-2.5 h-2.5 rounded-full bg-[#4F6EF7] loading-dot" />
+      </div>
+
+      {/* Collected fields summary */}
+      <div className="w-full max-w-xs glass-card p-4 animate-slide-up">
+        <p className="text-[10px] uppercase tracking-wider text-[#6B7A99] font-mono mb-3">Incident Details Collected</p>
+        <div className="space-y-2">
+          {Object.entries(fields).map(([key, field]) => (
+            <div key={key} className="flex items-center justify-between text-xs">
+              <span className="text-[#6B7A99] font-mono capitalize">{key.replace("_", " ")}</span>
+              <span className={`font-medium ${field.value ? "text-[#22C55E]" : "text-[#6B7A99]/40"}`}>
+                {field.value || "—"}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  /* =================== PAGE 3: RESULTS =================== */
+  const renderResultsPage = () => {
+    if (!prediction) return null;
+
+    const score = prediction.event_impact_score;
+    const severity = prediction.severity_band;
+    const color = getSeverityColor(severity);
+    const bgColor = getSeverityBg(severity);
+
+    // SVG arc calculation for the score gauge
+    const circumference = 2 * Math.PI * 40;
+    const arcLength = (score / 100) * circumference * 0.75; // 270 degree arc
+    const dashOffset = circumference * 0.75 - arcLength;
+
+    return (
+      <div className="flex flex-col h-full overflow-y-auto thin-scrollbar page-enter">
+        {/* Header */}
+        <header className="shrink-0 px-4 pt-3 pb-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#4F6EF7] to-[#7C3AED] flex items-center justify-center">
+              <Shield className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h1 className="text-sm font-bold">Dispatch Report</h1>
+              <p className="text-[10px] text-[#6B7A99] font-mono">ASTraM Intelligence</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#6B7A99]">
+            <span className="px-2 py-0.5 rounded-full bg-[#22C55E]/15 text-[#22C55E] border border-[#22C55E]/20">
+              ✓ {prediction.ensemble_confidence}
+            </span>
           </div>
         </header>
 
-        {/* 12-Column Main Workspace */}
-        <main className="flex-1 p-6 grid grid-cols-12 gap-6 min-h-0 overflow-y-auto">
-          
-          {/* ZONE B: Voice Interface Panel (left 5 cols) */}
-          <section className="col-span-5 flex flex-col gap-4 bg-[#111520] border border-[#1E2436] p-4 rounded-md min-h-[500px]">
-            <div className="text-xs uppercase tracking-wider text-[#6B7A99] font-mono border-b border-[#1E2436] pb-2">
-              Voice Interface Controller
-            </div>
+        {/* Content */}
+        <div className="flex-1 px-4 pb-4 space-y-4 stagger-children">
 
-            {sessionState === "READY" ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border border-dashed border-[#1E2436] rounded-md">
-                <span className="text-sm font-mono text-[#6B7A99] mb-4">
-                  Session offline. Establish communication link.
-                </span>
-                <Button
-                  onClick={startSession}
-                  className="bg-[#4F6EF7] hover:bg-[#4F6EF7]/80 text-white font-mono flex items-center gap-2"
-                >
-                  <Play className="w-4 h-4" />
-                  <span>START DISPATCH SESSION</span>
-                </Button>
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col min-h-0">
-                {/* Waveform Ring */}
-                <WaveformRing
-                  sessionState={sessionState}
-                  micActive={micActive}
-                  amplitude={amplitude}
+          {/* Impact Score Gauge */}
+          <div className="glass-card p-5 flex flex-col items-center">
+            <div className="relative w-36 h-36">
+              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-[135deg]">
+                {/* Background arc */}
+                <circle
+                  cx="50" cy="50" r="40"
+                  fill="none"
+                  stroke="#1E2436"
+                  strokeWidth="6"
+                  strokeDasharray={`${circumference * 0.75} ${circumference * 0.25}`}
+                  strokeLinecap="round"
                 />
+                {/* Score arc */}
+                <circle
+                  cx="50" cy="50" r="40"
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="6"
+                  strokeDasharray={`${arcLength} ${circumference - arcLength}`}
+                  strokeLinecap="round"
+                  className="score-arc"
+                  style={{ filter: `drop-shadow(0 0 6px ${color}40)` }}
+                />
+              </svg>
+              {/* Center score text */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-3xl font-bold" style={{ color }}>{Math.round(score)}</span>
+                <span className="text-[10px] text-[#6B7A99] font-mono">IMPACT</span>
+              </div>
+            </div>
 
-                {/* Live rolling transcript log */}
-                <TranscriptScroll lines={transcripts} />
+            {/* Severity Badge */}
+            <div
+              className="mt-2 px-4 py-1.5 rounded-full text-xs font-bold tracking-wider"
+              style={{ backgroundColor: bgColor, color, border: `1px solid ${color}30` }}
+            >
+              {severity} SEVERITY
+            </div>
+          </div>
 
-                {/* Quick Simulation input bar for test environment */}
-                <form onSubmit={handleSendText} className="mt-3 flex gap-2">
-                  <input
-                    type="text"
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    placeholder="Simulate operator speech..."
-                    className="flex-1 bg-[#161B2E] border border-[#1E2436] rounded px-3 py-1.5 text-sm text-[#F0F4FF] focus:outline-none focus:border-[#4F6EF7] font-mono placeholder-[#6B7A99]"
-                  />
-                  <Button type="submit" size="sm" className="bg-[#4F6EF7] hover:bg-[#4F6EF7]/80 text-white font-mono text-xs">
-                    SEND
-                  </Button>
-                </form>
+          {/* Resource Cards Grid */}
+          <div className="grid grid-cols-3 gap-2.5">
+            {/* Officers */}
+            <div className="glass-card p-3 flex flex-col items-center text-center">
+              <div className="w-9 h-9 rounded-full bg-[#4F6EF7]/15 flex items-center justify-center mb-2">
+                <Users className="w-4 h-4 text-[#4F6EF7]" />
+              </div>
+              <span className="text-xl font-bold text-[#F0F4FF]">{prediction.recommended_officers}</span>
+              <span className="text-[9px] text-[#6B7A99] font-mono mt-0.5">OFFICERS</span>
+            </div>
 
-                {/* Bottom voice control actions bar */}
-                <div className="mt-4 pt-3 border-t border-[#1E2436] flex items-center justify-between">
-                  <Button
-                    size="sm"
-                    onClick={replayLastAudio}
-                    className="bg-[#161B2E] hover:bg-[#1E2436] text-[#F0F4FF] border border-[#1E2436] text-xs font-mono flex items-center gap-1.5"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>REPLAY LAST</span>
-                  </Button>
+            {/* Barricades */}
+            <div className="glass-card p-3 flex flex-col items-center text-center">
+              <div className="w-9 h-9 rounded-full bg-[#F97316]/15 flex items-center justify-center mb-2">
+                <Construction className="w-4 h-4 text-[#F97316]" />
+              </div>
+              <span className="text-xl font-bold text-[#F0F4FF]">{prediction.recommended_barricades}</span>
+              <span className="text-[9px] text-[#6B7A99] font-mono mt-0.5">BARRICADES</span>
+            </div>
 
-                  <div className="flex items-center gap-2">
-                    {/* Simulated push to talk action */}
-                    <button
-                      onMouseDown={() => setMicActive(true)}
-                      onMouseUp={() => setMicActive(false)}
-                      onTouchStart={() => setMicActive(true)}
-                      onTouchEnd={() => setMicActive(false)}
-                      className={`px-4 py-2 rounded font-mono text-xs font-semibold select-none border transition-all ${
-                        micActive
-                          ? "bg-[#4F6EF7] text-white border-[#4F6EF7] shadow-[0_0_15px_rgba(79,110,247,0.4)]"
-                          : "bg-[#161B2E] text-[#F0F4FF] border-[#1E2436] hover:bg-[#1E2436]"
-                      }`}
-                    >
-                      {micActive ? "RELEASE TO SEND" : "HOLD SPACE / CLICK TO SPEAK"}
-                    </button>
+            {/* Diversion */}
+            <div className="glass-card p-3 flex flex-col items-center text-center">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center mb-2 ${
+                prediction.diversion_required === "YES" || prediction.diversion_required === true
+                  ? "bg-[#EF4444]/15"
+                  : "bg-[#22C55E]/15"
+              }`}>
+                <AlertTriangle className={`w-4 h-4 ${
+                  prediction.diversion_required === "YES" || prediction.diversion_required === true
+                    ? "text-[#EF4444]"
+                    : "text-[#22C55E]"
+                }`} />
+              </div>
+              <span className={`text-sm font-bold ${
+                prediction.diversion_required === "YES" || prediction.diversion_required === true
+                  ? "text-[#EF4444]"
+                  : "text-[#22C55E]"
+              }`}>
+                {prediction.diversion_required === "YES" || prediction.diversion_required === true ? "YES" : "NO"}
+              </span>
+              <span className="text-[9px] text-[#6B7A99] font-mono mt-0.5">DIVERSION</span>
+            </div>
+          </div>
+
+          {/* Incident Summary */}
+          <div className="glass-card p-4">
+            <p className="text-[10px] uppercase tracking-wider text-[#6B7A99] font-mono mb-3">Incident Summary</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+              <div>
+                <span className="text-[10px] text-[#6B7A99] font-mono block">Location</span>
+                <span className="text-[13px] text-[#F0F4FF]">{fields.location.value || "—"}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-[#6B7A99] font-mono block">Event Type</span>
+                <span className="text-[13px] text-[#F0F4FF] capitalize">{fields.event_type.value || "—"}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-[#6B7A99] font-mono block">Cause</span>
+                <span className="text-[13px] text-[#F0F4FF] capitalize">{(fields.event_cause.value || "—").replace("_", " ")}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-[#6B7A99] font-mono block">Priority</span>
+                <span className={`text-[13px] font-semibold ${
+                  fields.priority.value === "High" ? "text-[#EF4444]" : "text-[#22C55E]"
+                }`}>{fields.priority.value || "—"}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-[#6B7A99] font-mono block">Vehicle</span>
+                <span className="text-[13px] text-[#F0F4FF] capitalize">{fields.vehicle_type.value || "—"}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-[#6B7A99] font-mono block">Zone</span>
+                <span className="text-[13px] text-[#F0F4FF]">{resolvedFields.zone || "—"}</span>
+              </div>
+            </div>
+
+            {/* Extra resolved metadata */}
+            <div className="mt-3 pt-3 border-t border-[#1E2436] grid grid-cols-3 gap-2 text-[10px] font-mono">
+              <div>
+                <span className="text-[#6B7A99] block">Corridor</span>
+                <span className="text-[#F0F4FF] truncate block">{resolvedFields.corridor || "—"}</span>
+              </div>
+              <div>
+                <span className="text-[#6B7A99] block">Station</span>
+                <span className="text-[#F0F4FF] truncate block">{resolvedFields.police_station || "—"}</span>
+              </div>
+              <div>
+                <span className="text-[#6B7A99] block">Time</span>
+                <span className="text-[#F0F4FF] block">{resolvedFields.time || "—"}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* RAG Recommendations */}
+          {recommendations.length > 0 && (
+            <div className="glass-card p-4">
+              <p className="text-[10px] uppercase tracking-wider text-[#6B7A99] font-mono mb-3">Traffic Intelligence</p>
+              <div className="space-y-2.5">
+                {recommendations.map((rec, i) => (
+                  <div key={i} className="flex gap-2.5">
+                    <div className="w-5 h-5 rounded-full bg-[#4F6EF7]/15 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-[9px] font-bold text-[#4F6EF7]">{i + 1}</span>
+                    </div>
+                    <p className="text-[12px] text-[#F0F4FF]/80 leading-relaxed">{rec}</p>
                   </div>
-
-                  <Button
-                    size="sm"
-                    onClick={endSession}
-                    className="bg-[#EF4444]/10 hover:bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/20 text-xs font-mono flex items-center gap-1.5"
-                  >
-                    <Square className="w-3.5 h-3.5" />
-                    <span>END SESSION</span>
-                  </Button>
-                </div>
-              </div>
-            )}
-          </section>
-
-          {/* ZONE C: Field Collection Status (center 3 cols) */}
-          <section className="col-span-3 flex flex-col gap-4 bg-[#111520] border border-[#1E2436] p-4 rounded-md">
-            <div className="text-xs uppercase tracking-wider text-[#6B7A99] font-mono border-b border-[#1E2436] pb-2">
-              Field Collection Status
-            </div>
-
-            {/* Status cards stack */}
-            <div className="flex-1 flex flex-col gap-3">
-              <FieldCard name="Location" value={fields.location.value} state={fields.location.state as any} />
-              <FieldCard name="Event Type" value={fields.event_type.value} state={fields.event_type.state as any} />
-              <FieldCard name="Event Cause" value={fields.event_cause.value} state={fields.event_cause.state as any} />
-              <FieldCard name="Priority" value={fields.priority.value} state={fields.priority.state as any} />
-              <FieldCard name="Vehicle Type" value={fields.vehicle_type.value} state={fields.vehicle_type.state as any} />
-
-              {/* Auto-resolved Fields collapsible section */}
-              <div className="border border-[#1E2436] rounded bg-[#161B2E] mt-2 overflow-hidden">
-                <button
-                  onClick={() => setAutoResolvedExpanded(!autoResolvedExpanded)}
-                  className="w-full px-3 py-2 flex items-center justify-between text-xs font-mono text-[#6B7A99] hover:bg-[#1E2436]/50 transition-colors"
-                >
-                  <span>Auto Resolved Metadata</span>
-                  {autoResolvedExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                </button>
-
-                {autoResolvedExpanded && (
-                  <div className="p-3 border-t border-[#1E2436] grid grid-cols-2 gap-2 text-[10px] font-mono bg-[#111520]">
-                    <div className="flex flex-col">
-                      <span className="text-[#6B7A99]">Corridor</span>
-                      <span className="text-[#F0F4FF] truncate">{resolvedFields.corridor || "Not resolved"}</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[#6B7A99]">Police Station</span>
-                      <span className="text-[#F0F4FF] truncate">{resolvedFields.police_station || "Not resolved"}</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[#6B7A99]">Zone</span>
-                      <span className="text-[#F0F4FF] truncate">{resolvedFields.zone || "Not resolved"}</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[#6B7A99]">Date</span>
-                      <span className="text-[#F0F4FF]">{resolvedFields.date || "Not resolved"}</span>
-                    </div>
-                    <div className="flex flex-col col-span-2">
-                      <span className="text-[#6B7A99]">Time</span>
-                      <span className="text-[#F0F4FF]">{resolvedFields.time || "Not resolved"}</span>
-                    </div>
-                  </div>
-                )}
+                ))}
               </div>
             </div>
+          )}
 
-            {/* Progress indicator */}
-            <div className="pt-3 border-t border-[#1E2436] space-y-2">
-              <div className="flex justify-between text-xs font-mono">
-                <span className="text-[#6B7A99]">Extraction Progress:</span>
-                <span className="text-[#4F6EF7]">{confirmedCount}/5 Fields</span>
-              </div>
-              <Progress value={progressPercent} className="h-1.5 bg-[#111520] border border-[#1E2436]" />
-            </div>
-
-            {/* Run dispatch dispatch control */}
-            {sessionState !== "READY" && (
-              <Button
-                disabled={sessionState === "PROCESSING"}
-                onClick={handleSubmitPrediction}
-                className="w-full mt-2 bg-[#7C3AED] hover:bg-[#7C3AED]/80 text-white font-mono text-xs h-9"
-              >
-                SUBMIT FOR ML PREDICTION
-              </Button>
-            )}
-          </section>
-
-          {/* ZONE D: Prediction Results Panel (right 4 cols) */}
-          <section className="col-span-4 flex flex-col gap-4 bg-[#111520] border border-[#1E2436] p-4 rounded-md">
-            <div className="text-xs uppercase tracking-wider text-[#6B7A99] font-mono border-b border-[#1E2436] pb-2">
-              Incident Prediction & RAG Directives
-            </div>
-
-            {!prediction ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border border-dashed border-[#1E2436] rounded-md">
-                <span className="text-xs font-mono text-[#6B7A99]">
-                  Awaiting dispatch submission. Collect incident variables above and trigger ML prediction pipeline.
-                </span>
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col gap-4 animate-fade-in">
-                {/* 4 Metrics display */}
-                <div className="grid grid-cols-1 gap-3">
-                  <GaugeCard
-                    score={prediction.event_impact_score}
-                    severity={prediction.severity_band}
-                  />
-                  <MetricCard
-                    type="diversion"
-                    value={prediction.diversion_required}
-                  />
-                  <div className="grid grid-cols-2 gap-3">
-                    <MetricCard
-                      type="officers"
-                      value={prediction.recommended_officers}
-                    />
-                    <MetricCard
-                      type="barricades"
-                      value={prediction.recommended_barricades}
-                    />
-                  </div>
-                </div>
-
-                {/* Ensemble confidence banner */}
-                <div className="bg-[#161B2E] border border-[#1E2436] rounded-md px-3 py-1.5 flex items-center justify-between text-xs font-mono text-[#6B7A99]">
-                  <span>System Reliability Match</span>
-                  <span className="text-[#22C55E] font-semibold">
-                    {prediction.ensemble_confidence}
-                  </span>
-                </div>
-
-                {/* RAG Recommendations List */}
-                <RecommendationList recommendations={recommendations} />
-
-                {/* Export Button */}
-                <Button
-                  onClick={handleExportReport}
-                  className="w-full bg-[#4F6EF7] hover:bg-[#4F6EF7]/80 text-white font-mono text-xs flex items-center justify-center gap-1.5 mt-auto"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>EXPORT DISPATCH REPORT</span>
-                </Button>
-              </div>
-            )}
-          </section>
-        </main>
+          {/* Action Buttons */}
+          <div className="flex gap-2.5 safe-bottom pt-1 pb-2">
+            <button
+              onClick={handleExportReport}
+              className="flex-1 flex items-center justify-center gap-2 bg-[#4F6EF7] text-white text-sm font-semibold py-3 rounded-2xl active:scale-95 transition-transform shadow-[0_4px_15px_rgba(79,110,247,0.25)]"
+            >
+              <Download className="w-4 h-4" />
+              Export Report
+            </button>
+            <button
+              onClick={handleNewIncident}
+              className="flex-1 flex items-center justify-center gap-2 bg-[#161B2E] border border-[#1E2436] text-[#F0F4FF] text-sm font-semibold py-3 rounded-2xl active:scale-95 transition-transform"
+            >
+              <RotateCcw className="w-4 h-4" />
+              New Incident
+            </button>
+          </div>
+        </div>
       </div>
-    </TooltipProvider>
+    );
+  };
+
+  /* =================== MAIN RENDER =================== */
+  return (
+    <div className="h-[100dvh] w-full max-w-md mx-auto bg-[#0A0D14] text-[#F0F4FF] flex flex-col overflow-hidden font-sans">
+      {currentPage === "gather" && renderDataGatheringPage()}
+      {currentPage === "inferencing" && renderInferencingPage()}
+      {currentPage === "results" && renderResultsPage()}
+    </div>
   );
 }

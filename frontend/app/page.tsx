@@ -1,5 +1,5 @@
-import VoiceDispatchPage from "./voice/page";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return <VoiceDispatchPage />;
+  redirect("/voice");
 }

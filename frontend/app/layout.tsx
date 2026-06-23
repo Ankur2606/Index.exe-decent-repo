@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -14,8 +14,17 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ASTraM Voice Intelligence Traffic Dispatch Control",
-  description: "ASTraM voice first traffic incident dispatch dashboard for Bengaluru Traffic Police. Integrates real time AI extraction, ML congestion prediction, and RAG recommendations.",
+  title: "ASTraM — Voice Dispatch",
+  description: "ASTraM voice-first traffic incident dispatch for Bengaluru Traffic Police. AI-powered data collection, ML prediction, and RAG recommendations.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#0A0D14",
 };
 
 export default function RootLayout({
@@ -28,7 +37,7 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${jetbrains.variable} h-full antialiased dark`}
     >
-      <body className="min-h-full flex flex-col bg-[#0A0D14]">{children}</body>
+      <body className="h-[100dvh] overflow-hidden bg-[#0A0D14]">{children}</body>
     </html>
   );
 }
