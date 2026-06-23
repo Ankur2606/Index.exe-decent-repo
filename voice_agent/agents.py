@@ -31,7 +31,7 @@ async def generate_and_send_tts_async(text: str):
         print(f"Generating async TTS: '{text}'")
         response = client.audio.speech.create(
             model="canopylabs/orpheus-v1-english",
-            voice="troy",
+            voice="autumn",
             input=text,
             response_format="wav"
         )
@@ -81,6 +81,8 @@ def geocode_address(address: str) -> dict:
             asyncio.run_coroutine_threadsafe(emit_ws_event({"type": "field_resolved", "field": "corridor", "value": corr}), loop)
             asyncio.run_coroutine_threadsafe(emit_ws_event({"type": "field_resolved", "field": "police_station", "value": ps}), loop)
             asyncio.run_coroutine_threadsafe(emit_ws_event({"type": "field_resolved", "field": "zone", "value": zone}), loop)
+            asyncio.run_coroutine_threadsafe(emit_ws_event({"type": "field_resolved", "field": "latitude", "value": str(lat)}), loop)
+            asyncio.run_coroutine_threadsafe(emit_ws_event({"type": "field_resolved", "field": "longitude", "value": str(lon)}), loop)
             
     # Set the location field value
     display_name = address
@@ -173,25 +175,31 @@ def submit_prediction() -> dict:
             # Now run RAG Agent in background to populate recommendations
             run_rag_recommendations_pipeline(payload, predictions)
             
-            # Emit text summary transcript and trigger async TTS narration
-            summary_text = (
+            # UI text summary transcript (detailed)
+            ui_summary = (
                 f"Incident confirmed at {session_data['fields']['location'] or 'location'}. "
-                f"Event: {session_data['fields']['event_type'] or 'unplanned'} caused by {session_data['fields']['event_cause'] or 'others'}. "
+                f"Event: {session_data['fields']['event_type'] or 'unplanned'} caused by {(session_data['fields']['event_cause'] or 'others').replace('_', ' ')}. "
                 f"Priority: {session_data['fields']['priority'] or 'High'}. "
                 f"Deploy {predictions['recommended_officers']} officers and {predictions['recommended_barricades']} barricades. "
                 f"Diversion required: {predictions['diversion_required']}."
             )
             
+            # Conversational spoken text (extremely brief and user-friendly)
+            spoken_summary = (
+                f"Confirmed. Deploying {predictions['recommended_officers']} officers to {session_data['fields']['location'] or 'location'}. "
+                f"I've updated the resources and alternate routes on your screen."
+            )
+            
             if loop.is_running():
                 ts_now = datetime.datetime.now().strftime("%H:%M:%S")
-                state.add_transcript("agent", summary_text, ts_now)
+                state.add_transcript("agent", ui_summary, ts_now)
                 asyncio.run_coroutine_threadsafe(emit_ws_event({
                     "type": "transcript",
                     "speaker": "agent",
-                    "text": summary_text,
+                    "text": ui_summary,
                     "ts": ts_now
                 }), loop)
-                asyncio.run_coroutine_threadsafe(generate_and_send_tts_async(summary_text), loop)
+                asyncio.run_coroutine_threadsafe(generate_and_send_tts_async(spoken_summary), loop)
                 
             return predictions
         else:
@@ -212,24 +220,31 @@ def submit_prediction() -> dict:
             asyncio.run_coroutine_threadsafe(emit_ws_event({"type": "prediction_result", "data": fallback}), loop)
         run_rag_recommendations_pipeline(payload, fallback)
         
-        # Emit text summary transcript and trigger async TTS narration
-        summary_text = (
+        # UI text summary transcript (detailed)
+        ui_summary = (
             f"Incident confirmed at {session_data['fields']['location'] or 'location'}. "
-            f"Event: {session_data['fields']['event_type'] or 'unplanned'} caused by {session_data['fields']['event_cause'] or 'others'}. "
+            f"Event: {session_data['fields']['event_type'] or 'unplanned'} caused by {(session_data['fields']['event_cause'] or 'others').replace('_', ' ')}. "
             f"Priority: {session_data['fields']['priority'] or 'High'}. "
             f"Deploy {fallback['recommended_officers']} officers and {fallback['recommended_barricades']} barricades. "
             f"Diversion required: {fallback['diversion_required']}."
         )
+        
+        # Conversational spoken text (extremely brief and user-friendly)
+        spoken_summary = (
+            f"Confirmed. Deploying {fallback['recommended_officers']} officers to {session_data['fields']['location'] or 'location'}. "
+            f"I've updated the resources and alternate routes on your screen."
+        )
+        
         if loop.is_running():
             ts_now = datetime.datetime.now().strftime("%H:%M:%S")
-            state.add_transcript("agent", summary_text, ts_now)
+            state.add_transcript("agent", ui_summary, ts_now)
             asyncio.run_coroutine_threadsafe(emit_ws_event({
                 "type": "transcript",
                 "speaker": "agent",
-                "text": summary_text,
+                "text": ui_summary,
                 "ts": ts_now
             }), loop)
-            asyncio.run_coroutine_threadsafe(generate_and_send_tts_async(summary_text), loop)
+            asyncio.run_coroutine_threadsafe(generate_and_send_tts_async(spoken_summary), loop)
             
         return fallback
 

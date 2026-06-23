@@ -2,11 +2,15 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useVoiceSession } from "../../hooks/useVoiceSession";
-import { Mic, MicOff, Send, ChevronDown, Download, RotateCcw, Shield, Users, Construction, AlertTriangle, Layers, Radio } from "lucide-react";
+import { Mic, MicOff, Send, ChevronDown, Download, RotateCcw, Shield, Users, Construction, AlertTriangle, Layers, Radio, Volume2 } from "lucide-react";
 
 type PageView = "gather" | "inferencing" | "results";
 
 export default function VoiceDispatchPage() {
+  const [currentPage, setCurrentPage] = useState<PageView>("gather");
+  const [inputText, setInputText] = useState("");
+  const [mapView, setMapView] = useState<"tactical" | "satellite">("tactical");
+
   const {
     sessionState,
     transcripts,
@@ -25,10 +29,8 @@ export default function VoiceDispatchPage() {
     sendUserVoiceMessage,
     injectPresetTestCase,
     handleSubmitPrediction,
-  } = useVoiceSession();
-
-  const [currentPage, setCurrentPage] = useState<PageView>("gather");
-  const [inputText, setInputText] = useState("");
+    replayLastAudio,
+  } = useVoiceSession((text) => setInputText(text));
   const [toast, setToast] = useState<{ message: string; type: "error" | "info" | "success" } | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -80,6 +82,7 @@ export default function VoiceDispatchPage() {
     if (inputText.trim()) {
       sendUserVoiceMessage(inputText.trim());
       setInputText("");
+      setMicActive(false);
     }
   };
 
@@ -149,11 +152,22 @@ export default function VoiceDispatchPage() {
             </div>
           </div>
 
-          {/* Language Pills */}
-          <div className="flex items-center gap-1">
+          {/* Language Pills & Replay Button */}
+          <div className="flex items-center gap-1.5">
+            {sessionState !== "READY" && (
+              <button
+                type="button"
+                onClick={replayLastAudio}
+                className="w-7 h-7 rounded-full bg-[#161B2E] border border-[#1E2436] flex items-center justify-center text-[#6B7A99] hover:text-[#F0F4FF] hover:border-[#7C3AED]/40 active:scale-90 transition-all touch-target"
+                title="Replay last audio"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+              </button>
+            )}
             {["EN", "HI", "KA"].map((lang) => (
               <button
                 key={lang}
+                type="button"
                 onClick={() => changeLanguage(lang)}
                 className={`text-[11px] px-2.5 py-1 rounded-full font-semibold transition-all touch-target flex items-center justify-center ${
                   language === lang
@@ -455,6 +469,9 @@ export default function VoiceDispatchPage() {
     const color = getSeverityColor(severity);
     const bgColor = getSeverityBg(severity);
 
+    const latNum = resolvedFields.latitude ? Number(resolvedFields.latitude) : 12.96857;
+    const lonNum = resolvedFields.longitude ? Number(resolvedFields.longitude) : 77.70118;
+
     // SVG arc calculation for the score gauge
     const circumference = 2 * Math.PI * 40;
     const arcLength = (score / 100) * circumference * 0.75; // 270 degree arc
@@ -474,6 +491,13 @@ export default function VoiceDispatchPage() {
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] font-mono text-[#6B7A99]">
+            <button
+              type="button"
+              onClick={replayLastAudio}
+              className="px-2.5 py-1 rounded-full bg-[#7C3AED]/15 text-[#7C3AED] border border-[#7C3AED]/20 active:scale-95 flex items-center gap-1 font-semibold transition-all hover:bg-[#7C3AED]/25"
+            >
+              <Volume2 className="w-3.5 h-3.5" /> Replay
+            </button>
             <span className="px-2 py-0.5 rounded-full bg-[#22C55E]/15 text-[#22C55E] border border-[#22C55E]/20">
               ✓ {prediction.ensemble_confidence}
             </span>
@@ -565,6 +589,170 @@ export default function VoiceDispatchPage() {
                 {prediction.diversion_required === "YES" || prediction.diversion_required === true ? "YES" : "NO"}
               </span>
               <span className="text-[9px] text-[#6B7A99] font-mono mt-0.5">DIVERSION</span>
+            </div>
+          </div>
+
+          {/* Tactical Operations Map & Traffic Heatmap Card */}
+          <div className="glass-card overflow-hidden">
+            {/* Header / Tabs */}
+            <div className="px-4 py-3 border-b border-[#1E2436] flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-[#6B7A99] font-mono">Operations Radar Map</span>
+              <div className="flex bg-[#161B2E] rounded-lg p-0.5 border border-[#1E2436]">
+                <button
+                  type="button"
+                  onClick={() => setMapView("tactical")}
+                  className={`text-[9px] font-mono px-2.5 py-1 rounded transition-all ${
+                    mapView === "tactical"
+                      ? "bg-[#7C3AED] text-white shadow"
+                      : "text-[#6B7A99]"
+                  }`}
+                >
+                  TACTICAL RADAR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMapView("satellite")}
+                  className={`text-[9px] font-mono px-2.5 py-1 rounded transition-all ${
+                    mapView === "satellite"
+                      ? "bg-[#7C3AED] text-white shadow"
+                      : "text-[#6B7A99]"
+                  }`}
+                >
+                  LIVE MAP (OSM)
+                </button>
+              </div>
+            </div>
+
+            {/* Map Canvas / Container */}
+            <div className="relative h-48 bg-[#0D111A] flex items-center justify-center overflow-hidden">
+              {mapView === "satellite" && resolvedFields.latitude && resolvedFields.longitude ? (
+                /* Live OpenStreetMap Iframe Layer */
+                <iframe
+                  title="Satellite Incident Location Map"
+                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${lonNum - 0.005}%2C${latNum - 0.005}%2C${lonNum + 0.005}%2C${latNum + 0.005}&layer=mapnik&marker=${latNum}%2C${lonNum}`}
+                  className="w-full h-full border-none opacity-80 filter invert hue-rotate-180 brightness-90 contrast-125"
+                />
+              ) : (
+                /* Tactical Grid Heatmap & Radar Overlay */
+                <div className="absolute inset-0 w-full h-full p-4 flex flex-col justify-between font-mono select-none">
+                  {/* Glowing radar grid background lines */}
+                  <div className="absolute inset-0 grid grid-cols-6 grid-rows-6 opacity-10">
+                    {Array.from({ length: 36 }).map((_, i) => (
+                      <div key={i} className="border-[0.5px] border-[#4F6EF7]" />
+                    ))}
+                  </div>
+
+                  {/* Dynamic heat map circles based on impact score */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    {/* Concentric heat rings pulsing */}
+                    <div 
+                      className="absolute rounded-full border border-red-500/30 animate-pulse"
+                      style={{ 
+                        width: `${Math.min(180, score * 1.8)}px`, 
+                        height: `${Math.min(180, score * 1.8)}px`,
+                        backgroundColor: `rgba(239, 68, 68, ${Math.min(0.25, score / 400)})`,
+                        filter: 'blur(8px)'
+                      }}
+                    />
+                    <div 
+                      className="absolute rounded-full border border-orange-500/25 animate-ping opacity-30"
+                      style={{ 
+                        width: `${Math.min(120, score * 1.2)}px`, 
+                        height: `${Math.min(120, score * 1.2)}px`,
+                      }}
+                    />
+                  </div>
+
+                  {/* Roadblock indicator in the center */}
+                  <div className="absolute inset-0 flex items-center justify-center flex-col">
+                    <div className="relative">
+                      {/* Alert roadblock pulse dot */}
+                      <span className="absolute -top-1 -left-1 flex h-4 w-4">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                      </span>
+                      <div className="bg-[#111520] border-2 border-red-500 rounded-lg px-2 py-1 flex items-center gap-1.5 shadow-[0_0_15px_rgba(239,68,68,0.4)]">
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                        <span className="text-[9px] text-[#F0F4FF] font-bold tracking-wider">ROADBLOCK DETECTED</span>
+                      </div>
+                    </div>
+                    <span className="text-[8px] text-[#6B7A99] mt-1.5 font-semibold bg-[#111520] px-2 py-0.5 rounded border border-[#1E2436]">
+                      LAT: {resolvedFields.latitude ? Number(resolvedFields.latitude).toFixed(5) : "12.96857"} LON: {resolvedFields.longitude ? Number(resolvedFields.longitude).toFixed(5) : "77.70118"}
+                    </span>
+                  </div>
+
+                  {/* UI Radar overlay text */}
+                  <div className="flex justify-between items-start w-full relative z-10">
+                    <div className="text-[8px] text-[#22C55E] flex items-center gap-1 font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse" />
+                      LIVE TELEMETRY
+                    </div>
+                    <div className="text-[8px] text-[#6B7A99] text-right font-mono">
+                      CORRIDOR: {resolvedFields.corridor || "Non-corridor"}<br />
+                      JURISDICTION: {resolvedFields.police_station || "unknown"}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-end w-full relative z-10">
+                    <div className="text-[9px] font-bold text-red-500 bg-red-950/40 px-1.5 py-0.5 rounded border border-red-500/25">
+                      SEVERITY: {severity}
+                    </div>
+                    <div className="text-[8px] text-[#6B7A99]">
+                      GRID STATUS: DEGRADED
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sub-Panel: Congestion Delay Trends Graph */}
+            <div className="p-3.5 bg-[#111520] border-t border-[#1E2436] space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] font-mono text-[#6B7A99]">Corridor Flow & Delay Forecast (24h)</span>
+                <span className="text-[9px] font-mono text-[#22C55E] font-bold">Avg Speed: 14 km/h (-58%)</span>
+              </div>
+              
+              {/* Dynamic Styled SVG Chart */}
+              <div className="h-16 w-full relative">
+                <svg className="w-full h-full" viewBox="0 0 300 60" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#7C3AED" stopOpacity="0.4" />
+                      <stop offset="100%" stopColor="#7C3AED" stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
+                  
+                  {/* Chart Grid Lines */}
+                  <line x1="0" y1="15" x2="300" y2="15" stroke="#1E2436" strokeDasharray="3,3" strokeWidth="0.5" />
+                  <line x1="0" y1="35" x2="300" y2="35" stroke="#1E2436" strokeDasharray="3,3" strokeWidth="0.5" />
+                  
+                  {/* Fill under chart path */}
+                  <path
+                    d="M 0 50 Q 30 45 60 25 T 120 45 T 180 10 T 240 55 T 300 35 L 300 60 L 0 60 Z"
+                    fill="url(#chartGrad)"
+                  />
+                  
+                  {/* Smooth spline path */}
+                  <path
+                    d="M 0 50 Q 30 45 60 25 T 120 45 T 180 10 T 240 55 T 300 35"
+                    fill="none"
+                    stroke="#7C3AED"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  />
+                  
+                  {/* Highlight point on the peak */}
+                  <circle cx="180" cy="10" r="3.5" fill="#EF4444" className="grid-pulse" />
+                </svg>
+
+                {/* Hour labels */}
+                <div className="flex justify-between text-[8px] font-mono text-[#6B7A99] mt-1 px-1">
+                  <span>08:00 (Peak)</span>
+                  <span>12:00</span>
+                  <span>16:00 (Incident Peak)</span>
+                  <span>20:00</span>
+                </div>
+              </div>
             </div>
           </div>
 

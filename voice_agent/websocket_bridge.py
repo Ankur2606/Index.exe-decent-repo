@@ -76,8 +76,8 @@ GROQ_TOOLS = [
 ]
 
 # Prompt instructing LLM on requirement gathering with options
-SYSTEM_PROMPT = """You are ASTraM RequirementsAgent, an expert traffic incident voice dispatcher helper for Bengaluru Traffic Police.
-Your primary objective is to gather exactly 5 core variables from the operator's voice reports through a back-and-forth conversation before triggering the dispatch calculation.
+SYSTEM_PROMPT = """You are ASTraM RequirementsAgent, a friendly voice dispatcher helper for Bengaluru Traffic Police.
+Your primary objective is to gather exactly 5 core variables from the operator's voice reports through a back-and-forth friendly conversation before triggering the dispatch calculation.
 
 The 5 target variables and their exact allowed options are:
 1. LOCATION: The address description. Call `geocode_address` immediately once the operator mentions a location.
@@ -87,11 +87,12 @@ The 5 target variables and their exact allowed options are:
 5. VEHICLE_TYPE: Type of vehicle involved (e.g. 'two_wheeler', 'bus', 'car', 'auto', 'truck', 'unknown').
 
 Rules for Requirement Gathering:
-* Speak briefly, professionally, and extremely concisely. Your text output will be read aloud via Text-to-Speech (TTS), so keep your response under 25-35 words to save time and API tokens.
-* Check which of the 5 variables are missing.
-* If variables are missing, ask for them one by one. Always list the exact allowed options in parentheses to guide the operator (e.g. "What is the priority (High or Low)?" or "What is the cause (construction, water_logging, accident, vehicle_breakdown, public_rally, vip_movement, tree_fallen, fire_incident)?").
+* Speak briefly, professionally, and extremely concisely. Your text output will be read aloud via Text-to-Speech (TTS), so keep your response under 20-30 words.
+* NO UNDERSCORES IN SPEECH: Never output or speak options with underscores. Convert them to clean, natural space-separated words. For example: say "vehicle breakdown" (not "vehicle_breakdown"), "water logging" (not "water_logging"), "public rally" (not "public_rally"), "vip movement" (not "vip_movement"), "tree fallen" (not "tree_fallen"), "fire incident" (not "fire_incident"), and "two wheeler" (not "two_wheeler").
+* Human-Friendly Tone: Be helpful, warm, and conversational. Ask like a human assistant (e.g., "Got the location. What was the cause (accident, breakdown, construction)?" or "Is this high or low priority?"). Do not sound like a rigid robotic script.
+* Check which of the 5 variables are missing and ask for them one by one. Always list the exact allowed options in parentheses to guide the operator.
 * Once you identify a field value, call `update_field` immediately to confirm it in the system.
-* DO NOT call `submit_prediction` until you have gathered and updated all 5 variables. Once all 5 variables are resolved, confirm the details with the operator and call `submit_prediction` to finalize the dispatch.
+* DO NOT call `submit_prediction` until you have gathered and updated all 5 variables. Once all 5 variables are resolved, call `submit_prediction`.
 * When you call `submit_prediction`, simply respond with 'Calculating dispatch metrics now.' and nothing else. The system will automatically output and narrate the official dispatch report."""
 
 async def generate_and_send_tts(websocket: WebSocket, text: str, groq_client: Groq):
@@ -99,7 +100,7 @@ async def generate_and_send_tts(websocket: WebSocket, text: str, groq_client: Gr
         print(f"Generating TTS for: '{text}'")
         response = groq_client.audio.speech.create(
             model="canopylabs/orpheus-v1-english",
-            voice="troy",
+            voice="autumn",
             input=text,
             response_format="wav"
         )
@@ -137,11 +138,11 @@ async def websocket_endpoint(websocket: WebSocket, lang: str = "EN"):
     
     # Send a greeting transcript line from system
     ts = datetime.datetime.now().strftime("%H:%M:%S")
-    greeting = "ASTraM voice link established. State the traffic incident description."
+    greeting = "Hello there, welcome. You seem stuck, let me help."
     if lang == "HI":
-        greeting = "यातायात घटना का विवरण प्रदान करें।"
+        greeting = "नमस्ते! स्वागत है। लगता है आप कहीं फंस गए हैं, लाइए मैं आपकी मदद कर देती हूँ।"
     elif lang == "KA":
-        greeting = "ಸಂಚಾರ ಘಟನೆಯ ವಿವರವನ್ನು ನೀಡಿ."
+        greeting = "ನಮಸ್ತೆ! ಸ್ವಾಗತ. ನೀವು ಎಲ್ಲೋ ಸಿಲುಕಿಕೊಂಡಿರುವಂತೆ ತೋರುತ್ತಿದೆ, ಬನ್ನಿ ನಾನು ನಿಮಗೆ ಸಹಾಯ ಮಾಡುತ್ತೇನೆ."
         
     state.add_transcript("agent", greeting, ts)
     await websocket.send_text(json.dumps({
@@ -175,9 +176,32 @@ async def websocket_endpoint(websocket: WebSocket, lang: str = "EN"):
                 chat_history.append({"role": "user", "content": user_text})
                 
                 try:
+                    # Helper to construct messages with the latest system state injected dynamically
+                    def build_api_messages(history, current_state_fields):
+                        system_msg = {"role": "system", "content": SYSTEM_PROMPT}
+                        state_msg = {
+                            "role": "system", 
+                            "content": f"CRITICAL: Current backend fields state is: {json.dumps(current_state_fields)}. "
+                                       f"Verify this state. If any of the 5 fields are empty, you MUST ask for one missing field at a time. "
+                                       f"If all 5 fields are filled (non-empty), you MUST call `submit_prediction`."
+                        }
+                        filtered_history = []
+                        for m in history:
+                            if isinstance(m, dict):
+                                if m.get("role") == "system":
+                                    continue
+                                filtered_history.append(m)
+                            else:
+                                if getattr(m, "role", None) == "system":
+                                    continue
+                                filtered_history.append(m)
+                        return [system_msg, state_msg] + filtered_history
+
+                    messages = build_api_messages(chat_history, state.get_state()["fields"])
+
                     response = groq_client.chat.completions.create(
                         model="openai/gpt-oss-120b",
-                        messages=chat_history,
+                        messages=messages,
                         tools=GROQ_TOOLS,
                         tool_choice="auto",
                         temperature=0.2
@@ -201,10 +225,13 @@ async def websocket_endpoint(websocket: WebSocket, lang: str = "EN"):
                                     "content": json.dumps({"result": tool_result})
                                 })
                         
+                        # Re-build messages with the updated backend state after tool execution
+                        messages = build_api_messages(chat_history, state.get_state()["fields"])
+
                         # Get new completion from Groq with tool outputs
                         response = groq_client.chat.completions.create(
                             model="openai/gpt-oss-120b",
-                            messages=chat_history,
+                            messages=messages,
                             tools=GROQ_TOOLS,
                             tool_choice="auto",
                             temperature=0.2
@@ -267,6 +294,8 @@ async def websocket_endpoint(websocket: WebSocket, lang: str = "EN"):
                 await emit_ws_event({"type": "field_resolved", "field": "corridor", "value": "ORR East 2"})
                 await emit_ws_event({"type": "field_resolved", "field": "police_station", "value": "HAL Old Airport"})
                 await emit_ws_event({"type": "field_resolved", "field": "zone", "value": "East Zone 1"})
+                await emit_ws_event({"type": "field_resolved", "field": "latitude", "value": "12.9685753"})
+                await emit_ws_event({"type": "field_resolved", "field": "longitude", "value": "77.7011831"})
                 
                 # 3. Simulate dialogue transcript for feedback
                 await websocket.send_text(json.dumps({

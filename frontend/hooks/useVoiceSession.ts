@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { TranscriptLine, PredictionData, ResolvedFields, WsMessage, SessionState } from "../lib/types";
 
-export function useVoiceSession() {
+export function useVoiceSession(onSpeechResult?: (text: string) => void) {
+  const onSpeechResultRef = useRef(onSpeechResult);
+  useEffect(() => {
+    onSpeechResultRef.current = onSpeechResult;
+  }, [onSpeechResult]);
+
   const [sessionState, setSessionState] = useState<SessionState>("READY");
   const [transcripts, setTranscripts] = useState<TranscriptLine[]>([]);
   const [amplitude, setAmplitude] = useState<number>(0);
@@ -25,12 +30,15 @@ export function useVoiceSession() {
     zone: "",
     date: "",
     time: "",
+    latitude: "",
+    longitude: "",
   });
 
   const socketRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const ampIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const recognitionRef = useRef<any>(null);
+  const micIntentRef = useRef(false);
 
   // Active language code
   const [language, setLanguage] = useState<string>("EN");
@@ -85,8 +93,8 @@ export function useVoiceSession() {
       const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognitionClass) {
         const rec = new SpeechRecognitionClass();
-        rec.continuous = false;
-        rec.interimResults = false;
+        rec.continuous = true;
+        rec.interimResults = true;
         
         // Map language pills to browser recognition locales
         rec.lang = language === "HI" ? "hi-IN" : language === "KA" ? "kn-IN" : "en-IN";
@@ -96,35 +104,55 @@ export function useVoiceSession() {
         };
 
         rec.onresult = (event: any) => {
-          const text = event.results[0][0].transcript;
-          if (text) {
-            sendUserVoiceMessage(text);
+          let accumulatedTranscript = "";
+          for (let i = 0; i < event.results.length; ++i) {
+            accumulatedTranscript += event.results[i][0].transcript;
+          }
+          if (accumulatedTranscript && onSpeechResultRef.current) {
+            onSpeechResultRef.current(accumulatedTranscript);
           }
         };
 
         rec.onerror = (err: any) => {
           console.warn("Speech transcription warning:", err.error, err);
-          setMicActive(false);
           
-          let errMsg = "Speech recognition error occurred.";
+          let errMsg = "";
           if (err.error === "not-allowed") {
             errMsg = "Microphone access blocked. Please use localhost:3000 / localhost:7860 or run over HTTPS.";
+            setMicActive(false);
+            micIntentRef.current = false;
           } else if (err.error === "no-speech") {
-            errMsg = "No speech detected. Please check your microphone input levels.";
+            // Silence detected: do not show a system error toast or turn off the mic
+            // Just let onend restart it if micIntentRef is still true
+            return;
+          } else {
+            errMsg = `Speech recognition error: ${err.error}`;
+            setMicActive(false);
+            micIntentRef.current = false;
           }
           
-          setTranscripts((prev) => [
-            ...prev,
-            {
-              speaker: "agent",
-              text: `[SYSTEM: ${errMsg}]`,
-              ts: new Date().toLocaleTimeString(),
-            },
-          ]);
+          if (errMsg) {
+            setTranscripts((prev) => [
+              ...prev,
+              {
+                speaker: "agent",
+                text: `[SYSTEM: ${errMsg}]`,
+                ts: new Date().toLocaleTimeString(),
+              },
+            ]);
+          }
         };
 
         rec.onend = () => {
-          setMicActive(false);
+          if (micIntentRef.current) {
+            try {
+              rec.start();
+            } catch (err) {
+              console.warn("Failed to restart speech recognition on end:", err);
+            }
+          } else {
+            setMicActive(false);
+          }
         };
 
         recognitionRef.current = rec;
@@ -134,6 +162,7 @@ export function useVoiceSession() {
 
   // Activate Web Speech API on mic trigger
   useEffect(() => {
+    micIntentRef.current = micActive;
     if (micActive) {
       try {
         if (recognitionRef.current) {
@@ -269,6 +298,8 @@ export function useVoiceSession() {
       zone: "",
       date: "",
       time: "",
+      latitude: "",
+      longitude: "",
     });
     connectWs();
   };

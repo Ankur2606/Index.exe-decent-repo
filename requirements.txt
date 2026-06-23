@@ -23,6 +23,7 @@ annotated-types==0.7.0
 anyio==4.12.1
     # via
     #   google-genai
+    #   groq
     #   httpx
     #   starlette
     #   streamlit
@@ -99,7 +100,9 @@ debugpy==1.8.21
 decorator==5.3.1
     # via ipython
 distro==1.9.0
-    # via google-genai
+    # via
+    #   google-genai
+    #   groq
 docutils==0.23
     # via geohash2
 durationpy==0.10
@@ -164,6 +167,8 @@ graphviz==0.21
     #   google-adk
 greenlet==3.5.2
     # via sqlalchemy
+groq==1.5.0
+    # via event-driven-congestion (pyproject.toml)
 grpcio==1.80.0
     # via
     #   chromadb
@@ -190,6 +195,7 @@ httpx==0.28.1
     #   chromadb
     #   google-adk
     #   google-genai
+    #   groq
     #   huggingface-hub
 huggingface-hub==1.14.0
     # via
@@ -418,6 +424,7 @@ pydantic==2.13.4
     #   fastapi
     #   google-adk
     #   google-genai
+    #   groq
     #   pydantic-settings
 pydantic-core==2.46.4
     # via pydantic
@@ -528,7 +535,9 @@ six==1.17.0
 smmap==5.0.3
     # via gitdb
 sniffio==1.3.1
-    # via google-genai
+    # via
+    #   google-genai
+    #   groq
 sqlalchemy==2.0.51
     # via
     #   alembic
@@ -566,14 +575,14 @@ tokenizers==0.22.2
     #   transformers
 toml==0.10.2
     # via streamlit
-torch==2.11.0
+torch==2.11.0+cu128
     # via
     #   event-driven-congestion (pyproject.toml)
     #   sentence-transformers
     #   torchvision
-torchaudio==2.11.0
+torchaudio==2.11.0+cu128
     # via event-driven-congestion (pyproject.toml)
-torchvision==0.26.0
+torchvision==0.26.0+cu128
     # via event-driven-congestion (pyproject.toml)
 tornado==6.5.7
     # via
@@ -608,6 +617,7 @@ typing-extensions==4.15.0
     #   fastapi
     #   google-adk
     #   google-genai
+    #   groq
     #   grpcio
     #   huggingface-hub
     #   jupyter-client

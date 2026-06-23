@@ -29,6 +29,8 @@ export interface ResolvedFields {
   zone: string;
   date: string;
   time: string;
+  latitude?: string;
+  longitude?: string;
 }
 
 export type WsMessage =
