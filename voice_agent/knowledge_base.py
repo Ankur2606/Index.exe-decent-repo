@@ -45,16 +45,26 @@ def build_knowledge_base():
     persist_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), "..", "data", "chroma_db")
     os.makedirs(persist_dir, exist_ok=True)
     
-    chroma_client = chromadb.PersistentClient(path=persist_dir)
-    
-    collection = chroma_client.get_or_create_collection(
-        name="bengaluru_traffic",
-        metadata={"hnsw:space": "cosine"}
-    )
-    
-    if collection.count() > 0:
-        print(f"ChromaDB persistent collection loaded successfully with {collection.count()} chunks. Skipping rebuild.")
-        return
+    try:
+        chroma_client = chromadb.PersistentClient(path=persist_dir)
+        collection = chroma_client.get_or_create_collection(
+            name="bengaluru_traffic",
+            metadata={"hnsw:space": "cosine"}
+        )
+        if collection.count() > 0:
+            print(f"ChromaDB persistent collection loaded successfully with {collection.count()} chunks. Skipping rebuild.")
+            return
+    except Exception as e:
+        print(f"ChromaDB corrupt or unreadable ({e}). Wiping and rebuilding...")
+        # Wipe the corrupt database directory
+        import shutil
+        shutil.rmtree(persist_dir, ignore_errors=True)
+        os.makedirs(persist_dir, exist_ok=True)
+        chroma_client = chromadb.PersistentClient(path=persist_dir)
+        collection = chroma_client.get_or_create_collection(
+            name="bengaluru_traffic",
+            metadata={"hnsw:space": "cosine"}
+        )
 
     corpus = [
         # Category 1: Major Corridors and Their Properties

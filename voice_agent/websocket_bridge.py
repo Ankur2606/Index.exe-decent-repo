@@ -51,10 +51,15 @@ async def websocket_endpoint(websocket: WebSocket, lang: str = "EN"):
     
     # Initialize the GenAI Client and Chat Session
     api_key = os.getenv("GEMINI_API_KEY")
-    if api_key:
-        genai_client = genai.Client(api_key=api_key)
-    else:
-        genai_client = genai.Client()
+    if not api_key:
+        await websocket.send_text(json.dumps({
+            "type": "error",
+            "message": "GEMINI_API_KEY not configured. Please set it in HF Space Settings > Secrets."
+        }))
+        await websocket.close(code=1008, reason="Missing GEMINI_API_KEY")
+        return
+    
+    genai_client = genai.Client(api_key=api_key)
         
     chat = genai_client.chats.create(
         model="gemini-3.1-flash-live-preview",
