@@ -103,7 +103,7 @@ export function useVoiceSession() {
         };
 
         rec.onerror = (err: any) => {
-          console.error("Speech transcription error:", err.error, err);
+          console.warn("Speech transcription warning:", err.error, err);
           setMicActive(false);
           
           let errMsg = "Speech recognition error occurred.";
