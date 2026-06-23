@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "adk-skill": {
+      "source": "miticojo/adk-skill",
+      "sourceType": "github",
+      "skillPath": "adk-skill/SKILL.md",
+      "computedHash": "ec6555b6410fce162861c6df5b78a21745e901225ce618eb70d42bc0fc98b5f7"
+    }
+  }
+}
