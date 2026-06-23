@@ -18,7 +18,8 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m -u 1000 user
 USER user
 ENV HOME=/home/user \
-    PATH=/home/user/.local/bin:$PATH
+    PATH=/home/user/.local/bin:$PATH \
+    PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 WORKDIR $HOME/app
 
